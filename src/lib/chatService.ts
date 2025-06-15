@@ -8,6 +8,13 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface Conversation {
+  username: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+}
+
 class ChatService {
   private currentUser: string = '';
   private isAuthenticated: boolean = false;
@@ -20,6 +27,60 @@ class ChatService {
     // Clean up existing subscription
     if (this.subscription) {
       this.subscription.unsubscribe();
+    }
+  }
+
+  async getConversations(): Promise<Conversation[]> {
+    if (!supabase || !this.isAuthenticated) {
+      console.error('❌ Supabase not available or user not authenticated');
+      return [];
+    }
+
+    try {
+      // Get all chat messages involving the current user
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('pin_id, username, message, created_at')
+        .or(`username.eq.${this.currentUser},pin_id.like.%_${this.currentUser}_%`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching conversations:', error);
+        return [];
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Group messages by conversation and extract other participants
+      const conversationMap = new Map<string, Conversation>();
+
+      data.forEach(message => {
+        // Extract the other participant from the conversation ID
+        const otherUser = this.extractOtherUser(message.pin_id, this.currentUser);
+        if (!otherUser || otherUser === this.currentUser) return;
+
+        const existingConversation = conversationMap.get(otherUser);
+        
+        // If this is the first message for this conversation, or a more recent message
+        if (!existingConversation || new Date(message.created_at) > new Date(existingConversation.lastMessageTime)) {
+          conversationMap.set(otherUser, {
+            username: otherUser,
+            lastMessage: message.message,
+            lastMessageTime: message.created_at,
+            unreadCount: 0 // We'll implement read status later if needed
+          });
+        }
+      });
+
+      // Convert map to array and sort by last message time
+      return Array.from(conversationMap.values())
+        .sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+
+    } catch (err) {
+      console.error('💥 Failed to fetch conversations:', err);
+      return [];
     }
   }
 
@@ -121,6 +182,42 @@ class ChatService {
     // Create a consistent conversation ID by sorting usernames
     const participants = [user1, user2].sort();
     return `dm_${participants[0]}_${participants[1]}`;
+  }
+
+  private extractOtherUser(conversationId: string, currentUser: string): string | null {
+    // Extract usernames from conversation ID format: "dm_user1_user2"
+    if (!conversationId.startsWith('dm_')) return null;
+    
+    const parts = conversationId.substring(3).split('_');
+    if (parts.length < 2) return null;
+    
+    // Find the user that isn't the current user
+    const user1 = parts[0];
+    const user2 = parts.slice(1).join('_'); // Handle usernames with underscores
+    
+    if (user1 === currentUser) {
+      return user2;
+    } else if (user2 === currentUser) {
+      return user1;
+    }
+    
+    // If neither matches exactly, try to find the current user in the conversation ID
+    const fullConversationUsers = conversationId.substring(3);
+    if (fullConversationUsers.includes(currentUser)) {
+      // Extract the other user by removing current user from the string
+      const withoutPrefix = conversationId.substring(3);
+      const currentUserIndex = withoutPrefix.indexOf(currentUser);
+      
+      if (currentUserIndex === 0) {
+        // Current user is first, other user is after the underscore
+        return withoutPrefix.substring(currentUser.length + 1);
+      } else {
+        // Current user is second, other user is before the underscore
+        return withoutPrefix.substring(0, currentUserIndex - 1);
+      }
+    }
+    
+    return null;
   }
 
   isConnected(): boolean {

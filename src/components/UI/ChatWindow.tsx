@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, Database as DatabaseX } from 'lucide-react';
-import { chatService, ChatMessage } from '../../lib/chatService';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search } from 'lucide-react';
+import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -20,21 +20,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [recipientUsername, setRecipientUsername] = useState<string>(initialRecipientUsername);
+  const [newChatUsername, setNewChatUsername] = useState<string>('');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [viewingConversation, setViewingConversation] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState(false);
   const [messageError, setMessageError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Set initial recipient when modal opens
-  useEffect(() => {
-    if (isOpen && initialRecipientUsername) {
-      setRecipientUsername(initialRecipientUsername);
-    }
-  }, [isOpen, initialRecipientUsername]);
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
       initializeChat();
+      fetchConversations();
     }
 
     return () => {
@@ -42,11 +40,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     };
   }, [isOpen, currentUser, isAuthenticated]);
 
+  // Handle initial recipient when modal opens
   useEffect(() => {
-    if (recipientUsername && isConnected) {
+    if (isOpen && initialRecipientUsername) {
+      setRecipientUsername(initialRecipientUsername);
+      setViewingConversation(true);
+    }
+  }, [isOpen, initialRecipientUsername]);
+
+  useEffect(() => {
+    if (recipientUsername && isConnected && viewingConversation) {
       loadConversation();
     }
-  }, [recipientUsername, isConnected]);
+  }, [recipientUsername, isConnected, viewingConversation]);
 
   useEffect(() => {
     scrollToBottom();
@@ -56,6 +62,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     chatService.initialize(currentUser, isAuthenticated);
     setIsConnected(chatService.isConnected());
     setMessageError('');
+  };
+
+  const fetchConversations = async () => {
+    setIsLoadingConversations(true);
+    try {
+      const conversationList = await chatService.getConversations();
+      setConversations(conversationList);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
   };
 
   const loadConversation = async () => {
@@ -102,6 +120,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       if (success) {
         setNewMessage('');
         setMessageError('');
+        // Refresh conversations list to update last message
+        await fetchConversations();
         // Message will be added via the real-time subscription
       } else {
         setMessageError('Failed to send message');
@@ -121,12 +141,51 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  const handleStartNewChat = () => {
+    if (!newChatUsername.trim()) return;
+    
+    setRecipientUsername(newChatUsername.trim());
+    setNewChatUsername('');
+    setViewingConversation(true);
+  };
+
+  const handleSelectConversation = (conversation: Conversation) => {
+    setRecipientUsername(conversation.username);
+    setViewingConversation(true);
+  };
+
+  const handleBackToConversations = () => {
+    chatService.unsubscribeFromConversation();
+    setViewingConversation(false);
+    setRecipientUsername('');
+    setMessages([]);
+    setMessageError('');
+    fetchConversations(); // Refresh the conversations list
+  };
+
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  const formatRelativeTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.abs(now.getTime() - date.getTime()) / (1000 * 60);
+      return `${Math.floor(diffInMinutes)}m ago`;
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else if (diffInHours < 168) { // 7 days
+      return `${Math.floor(diffInHours / 24)}d ago`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
   };
 
   const formatDate = (timestamp: string) => {
@@ -240,25 +299,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Regular chat interface for authenticated users
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] overflow-hidden flex flex-col">
         
         {/* Chat Header */}
         <div className="glass-header p-4 text-white border-b border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <MessageSquare className="w-5 h-5 icon-shadow-white-sm" />
-              <h3 className="font-semibold text-shadow-white-sm">Direct Messages</h3>
-              {recipientUsername && (
-                <span className="text-blue-200 text-sm">
-                  → {recipientUsername}
-                </span>
+              {viewingConversation && (
+                <button
+                  onClick={handleBackToConversations}
+                  className="p-1 hover:bg-white/20 rounded-full transition-colors mr-2"
+                  title="Back to conversations"
+                >
+                  <ArrowLeft className="w-4 h-4 icon-shadow-white-sm" />
+                </button>
               )}
+              <MessageSquare className="w-5 h-5 icon-shadow-white-sm" />
+              <h3 className="font-semibold text-shadow-white-sm">
+                {viewingConversation ? `Chat with ${recipientUsername}` : 'Direct Messages'}
+              </h3>
             </div>
             <div className="flex items-center space-x-2">
               {isConnected ? (
                 <Database className="w-4 h-4 text-green-400 icon-shadow-white-sm" />
               ) : (
-                <DatabaseX className="w-4 h-4 text-red-400 icon-shadow-white-sm" />
+                <Database className="w-4 h-4 text-red-400 icon-shadow-white-sm" />
               )}
               <button
                 onClick={onClose}
@@ -281,24 +346,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         </div>
 
-        {/* Recipient Input */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center space-x-3">
-            <User className="w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={recipientUsername}
-              onChange={(e) => setRecipientUsername(e.target.value)}
-              placeholder="Enter username to message..."
-              className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
-            />
-          </div>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {recipientUsername ? (
-            <>
+        {viewingConversation ? (
+          // Individual Conversation View
+          <>
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {isLoading ? (
                 <div className="text-center py-8 text-gray-400">
                   <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
@@ -348,60 +400,137 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 ))
               )}
               <div ref={messagesEndRef} />
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">Welcome to Direct Messages</p>
-                <p className="text-sm">Enter a username above to start messaging</p>
+            </div>
+
+            {/* Error Message */}
+            {messageError && (
+              <div className="px-4 py-2 bg-red-900/30 border-t border-red-700">
+                <div className="flex items-center space-x-2 text-red-300">
+                  <AlertCircle className="w-4 h-4" />
+                  <p className="text-sm">{messageError}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Message Input */}
+            <div className="border-t border-gray-700 p-4">
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={`Message ${recipientUsername}...`}
+                  disabled={!isConnected || isLoading}
+                  className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || !isConnected || isLoading}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                >
+                  {isLoading ? (
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">Send</span>
+                </button>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Error Message */}
-        {messageError && (
-          <div className="px-4 py-2 bg-red-900/30 border-t border-red-700">
-            <div className="flex items-center space-x-2 text-red-300">
-              <AlertCircle className="w-4 h-4" />
-              <p className="text-sm">{messageError}</p>
+          </>
+        ) : (
+          // Conversations List View
+          <>
+            {/* Start New Chat */}
+            <div className="p-4 border-b border-gray-700">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">Start New Chat</h4>
+              <div className="flex items-center space-x-3">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={newChatUsername}
+                  onChange={(e) => setNewChatUsername(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleStartNewChat()}
+                  placeholder="Enter username..."
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                />
+                <button
+                  onClick={handleStartNewChat}
+                  disabled={!newChatUsername.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Start
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* Conversations List */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingConversations ? (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                  <p>Loading conversations...</p>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No conversations yet</p>
+                  <p className="text-sm">Start a new chat above to begin messaging</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-700">
+                  {conversations.map((conversation) => (
+                    <button
+                      key={conversation.username}
+                      onClick={() => handleSelectConversation(conversation)}
+                      className="w-full p-4 hover:bg-gray-800 transition-colors text-left flex items-center space-x-3"
+                    >
+                      {/* Avatar */}
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-6 h-6 text-white" />
+                      </div>
+                      
+                      {/* Conversation Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-medium text-gray-200 truncate">
+                            {conversation.username}
+                          </h4>
+                          <div className="flex items-center space-x-1 text-xs text-gray-400">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatRelativeTime(conversation.lastMessageTime)}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-400 truncate">
+                          {conversation.lastMessage}
+                        </p>
+                      </div>
+                      
+                      {/* Unread indicator (if needed) */}
+                      {conversation.unreadCount > 0 && (
+                        <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-white font-bold">
+                            {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
-        {/* Message Input */}
-        <div className="border-t border-gray-700 p-4">
-          <div className="flex space-x-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={recipientUsername ? `Message ${recipientUsername}...` : "Enter a username above first..."}
-              disabled={!isConnected || !recipientUsername.trim() || isLoading}
-              className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || !recipientUsername.trim() || !isConnected || isLoading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-            >
-              {isLoading ? (
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">Send</span>
-            </button>
-          </div>
-          
-          {!isConnected && (
-            <p className="text-xs text-red-400 mt-2">
+        {/* Connection Status Footer */}
+        {!isConnected && (
+          <div className="border-t border-gray-700 p-3 bg-red-900/20">
+            <p className="text-xs text-red-400 text-center">
               Not connected to Supabase. Please check your configuration.
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
