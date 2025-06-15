@@ -181,7 +181,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
         {/* Banner Section - removed overflow-hidden to fix profile picture clipping */}
         <div className="relative h-32 glass-header flex-shrink-0">
-          <div className="absolute inset-0 flex items-center justify-center z-0">
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-white">
               <User className="w-8 h-8 mx-auto mb-2 opacity-70 icon-shadow-white-sm" />
               <p className="text-sm opacity-70 text-shadow-white-sm">
@@ -204,7 +204,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           {/* Profile Header */}
           <div className="relative px-6 pb-6">
             {/* Profile Picture - adjusted position from -top-16 to -top-12 to reduce clipping */}
-            <div className="absolute -top-12 left-6 z-10">
+            <div className="absolute -top-12 left-6">
               <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
