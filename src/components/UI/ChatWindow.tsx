@@ -61,6 +61,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const loadConversation = async () => {
     if (!recipientUsername.trim()) return;
 
+    // Unsubscribe from any existing conversation before subscribing to a new one
+    chatService.unsubscribeFromConversation();
+
     setIsLoading(true);
     try {
       // Load existing messages
