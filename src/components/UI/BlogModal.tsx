@@ -8,6 +8,7 @@ interface BlogModalProps {
   onClose: () => void;
   currentUser: string;
   isAuthenticated: boolean;
+  onOpenUserProfile: (username: string) => void;
 }
 
 const BlogModal: React.FC<BlogModalProps> = ({
@@ -15,6 +16,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   onClose,
   currentUser,
   isAuthenticated,
+  onOpenUserProfile,
 }) => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,6 +26,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
+
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
 
   useEffect(() => {
     if (isOpen) {
@@ -115,6 +120,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
     return post.author_username === currentUser || isAdminUser;
   };
 
+  const handleUserProfileClick = (username: string) => {
+    // Only allow profile clicks for non-guest users
+    if (!isGuestUser(username)) {
+      onOpenUserProfile(username);
+    }
+  };
+
   if (!isOpen) return null;
 
   // Post detail view
@@ -136,9 +148,21 @@ const BlogModal: React.FC<BlogModalProps> = ({
                   <h2 className="text-xl font-bold text-shadow-white-md line-clamp-1">
                     {selectedPost.title}
                   </h2>
-                  <p className="text-blue-100 text-sm text-shadow-white-sm">
-                    by {selectedPost.author_username} • {formatDate(selectedPost.created_at)}
-                  </p>
+                  <div className="flex items-center space-x-2 text-blue-100 text-sm text-shadow-white-sm">
+                    <span>by</span>
+                    {isGuestUser(selectedPost.author_username) ? (
+                      <span>Guest {selectedPost.author_username}</span>
+                    ) : (
+                      <button
+                        onClick={() => handleUserProfileClick(selectedPost.author_username)}
+                        className="hover:underline transition-all"
+                      >
+                        {selectedPost.author_username}
+                      </button>
+                    )}
+                    <span>•</span>
+                    <span>{formatDate(selectedPost.created_at)}</span>
+                  </div>
                 </div>
               </div>
               <button
@@ -311,7 +335,19 @@ const BlogModal: React.FC<BlogModalProps> = ({
                           <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                             <User className="w-3 h-3 text-white" />
                           </div>
-                          <span className="text-sm text-gray-400">{post.author_username}</span>
+                          {isGuestUser(post.author_username) ? (
+                            <span className="text-sm text-gray-400">Guest {post.author_username}</span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUserProfileClick(post.author_username);
+                              }}
+                              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+                            >
+                              {post.author_username}
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="flex items-center space-x-1 text-xs text-gray-500">

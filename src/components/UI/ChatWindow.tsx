@@ -7,6 +7,7 @@ interface ChatWindowProps {
   onClose: () => void;
   currentUser: string;
   isAuthenticated: boolean;
+  initialRecipientUsername?: string;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -14,16 +15,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onClose,
   currentUser,
   isAuthenticated,
+  initialRecipientUsername = '',
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [recipientUsername, setRecipientUsername] = useState<string>('');
+  const [recipientUsername, setRecipientUsername] = useState<string>(initialRecipientUsername);
   const [isConnected, setIsConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [isTyping, setIsTyping] = useState(false);
   const [messageError, setMessageError] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Set initial recipient when modal opens
+  useEffect(() => {
+    if (isOpen && initialRecipientUsername) {
+      setRecipientUsername(initialRecipientUsername);
+    }
+  }, [isOpen, initialRecipientUsername]);
 
   useEffect(() => {
     // Only connect if user is authenticated
@@ -262,6 +271,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 icon-shadow-white-sm" />
               <h3 className="font-semibold text-shadow-white-sm">Direct Messages</h3>
+              {recipientUsername && (
+                <span className="text-blue-200 text-sm">
+                  → {recipientUsername}
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               {isConnected ? (

@@ -214,7 +214,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
                   onClick={() => handleUserProfileClick(pin.username)}
                   className="font-semibold text-sm hover:underline transition-all text-shadow-white-sm"
                 >
-                  Guest {pin.username}
+                  {pin.username}
                 </button>
               )}
               <p className="text-xs opacity-90 text-shadow-white-sm">{formatDate(pin.created_at)}</p>
@@ -363,7 +363,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
                     onClick={() => handleUserProfileClick(comment.username)}
                     className="font-medium text-blue-400 hover:underline"
                   >
-                    Guest {comment.username}
+                    {comment.username}
                   </button>
                 )}
                 <span className="text-gray-200 ml-2">{comment.text}</span>

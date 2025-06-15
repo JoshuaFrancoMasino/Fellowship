@@ -25,6 +25,7 @@ function App() {
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
   const [showSignOutConfirmation, setShowSignOutConfirmation] = useState(false);
   const [profileToViewUsername, setProfileToViewUsername] = useState('');
+  const [chatRecipientUsername, setChatRecipientUsername] = useState('');
   const [pinToOpenOnMap, setPinToOpenOnMap] = useState<string | null>(null);
   const [pinToCreateLocation, setPinToCreateLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [pinToEdit, setPinToEdit] = useState<Pin | null>(null);
@@ -174,7 +175,8 @@ function App() {
     setIsBlogModalOpen(true);
   };
 
-  const handleOpenChatWindow = () => {
+  const handleOpenChatWindow = (recipientUsername?: string) => {
+    setChatRecipientUsername(recipientUsername || '');
     setIsChatWindowOpen(true);
   };
 
@@ -545,7 +547,7 @@ function App() {
         onOpenExploreModal={handleOpenExploreModal}
         onOpenMarketplaceModal={handleOpenMarketplaceModal}
         onOpenBlogModal={handleOpenBlogModal}
-        onOpenChatWindow={handleOpenChatWindow}
+        onOpenChatWindow={() => handleOpenChatWindow()}
         onAuthButtonClick={handleAuthButtonClick}
         totalPins={pins.length}
         currentUser={currentUser}
@@ -569,6 +571,7 @@ function App() {
         onSelectPin={handleSelectPinFromProfile}
         onUsernameChange={handleUsernameChange}
         isCurrentUserAdmin={isAdminUser}
+        onOpenChatWindow={handleOpenChatWindow}
       />
 
       <ExploreModal
@@ -589,6 +592,7 @@ function App() {
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
         onOpenChatWindow={handleOpenChatWindow}
+        onOpenUserProfile={handleOpenUserProfile}
       />
 
       <BlogModal
@@ -596,6 +600,7 @@ function App() {
         onClose={() => setIsBlogModalOpen(false)}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
+        onOpenUserProfile={handleOpenUserProfile}
       />
 
       <ChatWindow
@@ -603,6 +608,7 @@ function App() {
         onClose={() => setIsChatWindowOpen(false)}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
+        initialRecipientUsername={chatRecipientUsername}
       />
 
       <SignOutConfirmationModal

@@ -10,7 +10,8 @@ interface MarketplaceModalProps {
   onClose: () => void;
   currentUser: string;
   isAuthenticated: boolean;
-  onOpenChatWindow: () => void;
+  onOpenChatWindow: (recipientUsername?: string) => void;
+  onOpenUserProfile: (username: string) => void;
 }
 
 const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
@@ -19,6 +20,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   currentUser,
   isAuthenticated,
   onOpenChatWindow,
+  onOpenUserProfile,
 }) => {
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +32,9 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   const [contactingItem, setContactingItem] = useState<string | null>(null);
   const [contactMessage, setContactMessage] = useState('');
   const [isAdminUser, setIsAdminUser] = useState(false);
+
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
 
   useEffect(() => {
     if (isOpen) {
@@ -141,7 +146,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
     if (success) {
       setContactingItem(null);
       setContactMessage('');
-      onOpenChatWindow();
+      onOpenChatWindow(item.seller_username);
       alert('Message sent! Check your direct messages to continue the conversation.');
     } else {
       alert('Failed to send message. Please try again.');
@@ -170,6 +175,13 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
 
   const handleCloseDetailModal = () => {
     setSelectedItem(null);
+  };
+
+  const handleUserProfileClick = (username: string) => {
+    // Only allow profile clicks for non-guest users
+    if (!isGuestUser(username)) {
+      onOpenUserProfile(username);
+    }
   };
 
   if (!isOpen) return null;
@@ -318,9 +330,21 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                           <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                             <User className="w-3 h-3 text-white" />
                           </div>
-                          <span className="text-sm text-gray-400">
-                            {item.seller_username.match(/^\d{7}$/) ? `Guest ${item.seller_username}` : item.seller_username}
-                          </span>
+                          {isGuestUser(item.seller_username) ? (
+                            <span className="text-sm text-gray-400 cursor-default">
+                              Guest {item.seller_username}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUserProfileClick(item.seller_username);
+                              }}
+                              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+                            >
+                              {item.seller_username}
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center space-x-1 text-xs text-gray-500">
                           <Calendar className="w-3 h-3" />
