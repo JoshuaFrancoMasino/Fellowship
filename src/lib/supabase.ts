@@ -137,13 +137,27 @@ export const getCurrentUserProfile = async (): Promise<Profile | null> => {
 export const getProfileByUsername = async (username: string): Promise<Profile | null> => {
   if (!supabase) return null;
   
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', username);
 
-  return profile;
+    if (error) {
+      console.error('❌ Error fetching profile by username:', error);
+      return null;
+    }
+
+    // Check if we have data and at least one result
+    if (data && data.length > 0) {
+      return data[0];
+    }
+
+    return null;
+  } catch (err) {
+    console.error('💥 Unexpected error in getProfileByUsername:', err);
+    return null;
+  }
 };
 
 export const updateUserProfile = async (userId: string, profileData: Partial<Profile>): Promise<boolean> => {
