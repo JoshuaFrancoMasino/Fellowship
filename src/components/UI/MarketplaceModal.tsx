@@ -1,0 +1,395 @@
+import React, { useState, useEffect } from 'react';
+import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter } from 'lucide-react';
+import { MarketplaceItem, getMarketplaceItems, supabase } from '../../lib/supabase';
+import CreateListingModal from './CreateListingModal';
+import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
+import { socketService } from '../../lib/socket';
+
+interface MarketplaceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: string;
+  isAuthenticated: boolean;
+  onOpenChatWindow: () => void;
+}
+
+const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
+  isOpen,
+  onClose,
+  currentUser,
+  isAuthenticated,
+  onOpenChatWindow,
+}) => {
+  const [items, setItems] = useState<MarketplaceItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price-low' | 'price-high'>('newest');
+  const [isCreateListingOpen, setIsCreateListingOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
+  const [contactingItem, setContactingItem] = useState<string | null>(null);
+  const [contactMessage, setContactMessage] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchItems();
+    }
+  }, [isOpen]);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const marketplaceItems = await getMarketplaceItems();
+      setItems(marketplaceItems);
+    } catch (error) {
+      console.error('Error fetching marketplace items:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredAndSortedItems = items
+    .filter(item => 
+      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.seller_username.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'price-low':
+          return a.price - b.price;
+        case 'price-high':
+          return b.price - a.price;
+        default:
+          return 0;
+      }
+    });
+
+  const handleContactSeller = async (item: MarketplaceItem) => {
+    if (!isAuthenticated) {
+      alert('Please sign in to contact sellers');
+      return;
+    }
+
+    if (!contactMessage.trim()) {
+      alert('Please enter a message');
+      return;
+    }
+
+    if (item.seller_username === currentUser) {
+      alert('You cannot contact yourself');
+      return;
+    }
+
+    // Send message through socket service
+    const success = socketService.sendPrivateMessage(
+      item.seller_username,
+      `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`
+    );
+
+    if (success) {
+      setContactingItem(null);
+      setContactMessage('');
+      onOpenChatWindow();
+      alert('Message sent! Check your direct messages to continue the conversation.');
+    } else {
+      alert('Failed to send message. Please try again.');
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const handleItemClick = (item: MarketplaceItem) => {
+    setSelectedItem(item);
+  };
+
+  const handleCloseDetailModal = () => {
+    setSelectedItem(null);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+          {/* Header */}
+          <div className="glass-header p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 glass-white rounded-full flex items-center justify-center">
+                  <ShoppingBag className="w-5 h-5 text-green-600 icon-shadow-white-sm" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-shadow-white-md">Marketplace</h2>
+                  <p className="text-blue-100 text-sm text-shadow-white-sm">
+                    Buy and sell items in your community
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {isAuthenticated && (
+                  <button
+                    onClick={() => setIsCreateListingOpen(true)}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Sell Item</span>
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 icon-shadow-white-sm" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search items, descriptions, or sellers..."
+                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                />
+              </div>
+
+              {/* Sort */}
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-gray-400" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Items Grid */}
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : filteredAndSortedItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <ShoppingBag className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">
+                  {searchTerm ? 'No items found' : 'No items for sale yet'}
+                </p>
+                <p className="text-sm">
+                  {searchTerm 
+                    ? 'Try adjusting your search terms' 
+                    : isAuthenticated 
+                      ? 'Be the first to list an item!' 
+                      : 'Sign in to start selling items'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredAndSortedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
+                    onClick={() => handleItemClick(item)}
+                  >
+                    {/* Item Image */}
+                    {item.images && item.images.length > 0 && (
+                      <div className="relative h-48 overflow-hidden">
+                        <img
+                          src={item.images[0]}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                        {item.images.length > 1 && (
+                          <div className="absolute top-2 right-2 bg-gray-800/70 text-gray-200 px-2 py-1 rounded-full text-xs">
+                            +{item.images.length - 1} more
+                          </div>
+                        )}
+                        <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                          {formatPrice(item.price)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Item Content */}
+                    <div className="p-4">
+                      {/* Title and Price */}
+                      <div className="mb-3">
+                        <h3 className="text-lg font-semibold text-gray-200 mb-1 line-clamp-1">
+                          {item.title}
+                        </h3>
+                        {(!item.images || item.images.length === 0) && (
+                          <div className="flex items-center space-x-2 text-green-400 mb-2">
+                            <DollarSign className="w-5 h-5" />
+                            <span className="text-xl font-bold">{formatPrice(item.price)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-sm text-gray-300 line-clamp-3 mb-4">
+                        {item.description}
+                      </p>
+
+                      {/* Seller Info */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <User className="w-3 h-3 text-white" />
+                          </div>
+                          <span className="text-sm text-gray-400">
+                            {item.seller_username.match(/^\d{7}$/) ? `Guest ${item.seller_username}` : item.seller_username}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-xs text-gray-500">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(item.created_at)}</span>
+                        </div>
+                      </div>
+
+                      {/* Contact Section */}
+                      {item.seller_username !== currentUser && (
+                        <div className="border-t border-gray-700 pt-4">
+                          {contactingItem === item.id ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={contactMessage}
+                                onChange={(e) => setContactMessage(e.target.value)}
+                                placeholder="Hi! I'm interested in this item..."
+                                maxLength={200}
+                                rows={3}
+                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 text-sm resize-none"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleContactSeller(item);
+                                  }}
+                                  disabled={!contactMessage.trim() || !isAuthenticated}
+                                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center space-x-1"
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                  <span>Send</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setContactingItem(null);
+                                    setContactMessage('');
+                                  }}
+                                  className="px-3 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition-colors text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {contactMessage.length}/200 characters
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAuthenticated) {
+                                  alert('Please sign in to contact sellers');
+                                  return;
+                                }
+                                setContactingItem(item.id);
+                              }}
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              <span>Contact Seller</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Own Item Indicator */}
+                      {item.seller_username === currentUser && (
+                        <div className="border-t border-gray-700 pt-4">
+                          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-center">
+                            <p className="text-blue-300 text-sm font-medium">Your Listing</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-700 p-4 bg-gray-900">
+            <div className="text-center text-sm text-gray-400">
+              Showing {filteredAndSortedItems.length} of {items.length} items
+              {!isAuthenticated && (
+                <span className="ml-2 text-blue-400">• Sign in to sell items</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Listing Modal */}
+      <CreateListingModal
+        isOpen={isCreateListingOpen}
+        onClose={() => setIsCreateListingOpen(false)}
+        onSuccess={() => {
+          setIsCreateListingOpen(false);
+          fetchItems();
+        }}
+        currentUser={currentUser}
+        isAuthenticated={isAuthenticated}
+      />
+
+      {/* Item Detail Modal */}
+      <MarketplaceItemDetailModal
+        isOpen={!!selectedItem}
+        onClose={handleCloseDetailModal}
+        item={selectedItem}
+        currentUser={currentUser}
+        isAuthenticated={isAuthenticated}
+        onOpenChatWindow={onOpenChatWindow}
+      />
+    </>
+  );
+};
+
+export default MarketplaceModal;
