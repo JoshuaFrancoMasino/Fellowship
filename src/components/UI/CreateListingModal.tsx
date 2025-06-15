@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { X, Upload, Plus, DollarSign, Package, AlertCircle } from 'lucide-react';
-import { createMarketplaceItem, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { X, Upload, Plus, DollarSign, Package, AlertCircle, Save } from 'lucide-react';
+import { createMarketplaceItem, updateMarketplaceItem, uploadImage, getImageUrl, getCurrentUserProfile, MarketplaceItem } from '../../lib/supabase';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface CreateListingModalProps {
   onSuccess: () => void;
   currentUser: string;
   isAuthenticated: boolean;
+  initialItem?: MarketplaceItem | null;
 }
 
 const CreateListingModal: React.FC<CreateListingModalProps> = ({
@@ -16,6 +17,7 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
   onSuccess,
   currentUser,
   isAuthenticated,
+  initialItem = null,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -26,6 +28,27 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
   const [uploadedPaths, setUploadedPaths] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const isEditMode = !!initialItem;
+
+  useEffect(() => {
+    if (initialItem) {
+      // Editing mode - populate form with existing data
+      setTitle(initialItem.title);
+      setDescription(initialItem.description);
+      setPrice(initialItem.price.toString());
+      setImages(initialItem.images || []);
+      setUploadedPaths(initialItem.storage_paths || []);
+    } else {
+      // Creating mode - reset form
+      setTitle('');
+      setDescription('');
+      setPrice('');
+      setImages([]);
+      setUploadedPaths([]);
+    }
+    setSubmitError(null);
+  }, [initialItem]);
 
   const resetForm = () => {
     setTitle('');
@@ -58,19 +81,31 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
     setSubmitError(null);
 
     try {
-      await createMarketplaceItem(
-        title.trim(),
-        description.trim(),
-        priceNumber,
-        images,
-        uploadedPaths
-      );
+      if (isEditMode && initialItem) {
+        // Update existing item
+        await updateMarketplaceItem(initialItem.id, {
+          title: title.trim(),
+          description: description.trim(),
+          price: priceNumber,
+          images,
+          storage_paths: uploadedPaths,
+        });
+      } else {
+        // Create new item
+        await createMarketplaceItem(
+          title.trim(),
+          description.trim(),
+          priceNumber,
+          images,
+          uploadedPaths
+        );
+      }
 
       resetForm();
       onSuccess();
     } catch (error: any) {
-      console.error('Failed to create listing:', error);
-      setSubmitError(error.message || 'Failed to create listing. Please try again.');
+      console.error(`Failed to ${isEditMode ? 'update' : 'create'} listing:`, error);
+      setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} listing. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -205,9 +240,11 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
                 <Package className="w-5 h-5 text-green-600 icon-shadow-white-sm" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-shadow-white-md">Create Listing</h2>
+                <h2 className="text-xl font-bold text-shadow-white-md">
+                  {isEditMode ? 'Edit Listing' : 'Create Listing'}
+                </h2>
                 <p className="text-green-100 text-sm text-shadow-white-sm">
-                  Sell an item to the community
+                  {isEditMode ? 'Update your marketplace listing' : 'Sell an item to the community'}
                 </p>
               </div>
             </div>
@@ -379,9 +416,17 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
             <button
               onClick={handleSubmit}
               disabled={!title.trim() || !description.trim() || !price.trim() || uploading || isSubmitting}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center space-x-2"
             >
-              {isSubmitting ? 'Creating...' : uploading ? 'Uploading...' : 'Create Listing'}
+              <Save className="w-4 h-4" />
+              <span>
+                {isSubmitting 
+                  ? (isEditMode ? 'Updating...' : 'Creating...') 
+                  : uploading 
+                    ? 'Uploading...' 
+                    : (isEditMode ? 'Update Listing' : 'Create Listing')
+                }
+              </span>
             </button>
           </div>
         </div>

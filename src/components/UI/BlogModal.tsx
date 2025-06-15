@@ -22,6 +22,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [filterBy, setFilterBy] = useState<'all' | 'my-posts'>('all');
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
+  const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
 
   useEffect(() => {
@@ -65,6 +66,11 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
   };
 
+  const handleEditPost = (post: BlogPost) => {
+    setPostToEdit(post);
+    setIsCreatePostOpen(true);
+  };
+
   const handleDeletePost = async (postId: string) => {
     if (!confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) {
       return;
@@ -102,6 +108,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
   };
 
   const canDeletePost = (post: BlogPost) => {
+    return post.author_username === currentUser || isAdminUser;
+  };
+
+  const canEditPost = (post: BlogPost) => {
     return post.author_username === currentUser || isAdminUser;
   };
 
@@ -161,16 +171,28 @@ const BlogModal: React.FC<BlogModalProps> = ({
                     <span>Published {formatDate(selectedPost.created_at)}</span>
                   </div>
                 </div>
-                {canDeletePost(selectedPost) && (
+                {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleDeletePost(selectedPost.id)}
-                      className="flex items-center space-x-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                      title={isAdminUser && selectedPost.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Delete</span>
-                    </button>
+                    {canEditPost(selectedPost) && (
+                      <button
+                        onClick={() => handleEditPost(selectedPost)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        title={isAdminUser && selectedPost.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                      >
+                        <Edit className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                    {canDeletePost(selectedPost) && (
+                      <button
+                        onClick={() => handleDeletePost(selectedPost.id)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                        title={isAdminUser && selectedPost.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -296,17 +318,33 @@ const BlogModal: React.FC<BlogModalProps> = ({
                             <Calendar className="w-3 h-3" />
                             <span>{formatDate(post.created_at)}</span>
                           </div>
-                          {canDeletePost(post) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletePost(post.id);
-                              }}
-                              className="p-1 hover:bg-red-600 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                              title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
-                            >
-                              <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
-                            </button>
+                          {(canEditPost(post) || canDeletePost(post)) && (
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canEditPost(post) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditPost(post);
+                                  }}
+                                  className="p-1 hover:bg-blue-600 rounded-full transition-colors"
+                                  title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                                >
+                                  <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
+                                </button>
+                              )}
+                              {canDeletePost(post) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePost(post.id);
+                                  }}
+                                  className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                                  title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                                >
+                                  <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -363,13 +401,18 @@ const BlogModal: React.FC<BlogModalProps> = ({
       {/* Create Blog Post Modal */}
       <CreateBlogPostModal
         isOpen={isCreatePostOpen}
-        onClose={() => setIsCreatePostOpen(false)}
+        onClose={() => {
+          setIsCreatePostOpen(false);
+          setPostToEdit(null);
+        }}
         onSuccess={() => {
           setIsCreatePostOpen(false);
+          setPostToEdit(null);
           fetchPosts();
         }}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
+        initialPost={postToEdit}
       />
     </>
   );

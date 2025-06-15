@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, BookOpen, Save, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { createBlogPost } from '../../lib/supabase';
+import { createBlogPost, updateBlogPost, BlogPost } from '../../lib/supabase';
 
 interface CreateBlogPostModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface CreateBlogPostModalProps {
   onSuccess: () => void;
   currentUser: string;
   isAuthenticated: boolean;
+  initialPost?: BlogPost | null;
 }
 
 const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
@@ -16,12 +17,30 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
   onSuccess,
   currentUser,
   isAuthenticated,
+  initialPost = null,
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isPublished, setIsPublished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const isEditMode = !!initialPost;
+
+  useEffect(() => {
+    if (initialPost) {
+      // Editing mode - populate form with existing data
+      setTitle(initialPost.title);
+      setContent(initialPost.content);
+      setIsPublished(initialPost.is_published);
+    } else {
+      // Creating mode - reset form
+      setTitle('');
+      setContent('');
+      setIsPublished(false);
+    }
+    setSubmitError(null);
+  }, [initialPost]);
 
   const resetForm = () => {
     setTitle('');
@@ -45,12 +64,23 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     setSubmitError(null);
 
     try {
-      await createBlogPost(title.trim(), content.trim(), isPublished);
+      if (isEditMode && initialPost) {
+        // Update existing post
+        await updateBlogPost(initialPost.id, {
+          title: title.trim(),
+          content: content.trim(),
+          is_published: isPublished,
+        });
+      } else {
+        // Create new post
+        await createBlogPost(title.trim(), content.trim(), isPublished);
+      }
+      
       resetForm();
       onSuccess();
     } catch (error: any) {
-      console.error('Failed to create blog post:', error);
-      setSubmitError(error.message || 'Failed to create blog post. Please try again.');
+      console.error(`Failed to ${isEditMode ? 'update' : 'create'} blog post:`, error);
+      setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} blog post. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,9 +152,11 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
                 <BookOpen className="w-5 h-5 text-blue-600 icon-shadow-white-sm" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-shadow-white-md">Create Blog Post</h2>
+                <h2 className="text-xl font-bold text-shadow-white-md">
+                  {isEditMode ? 'Edit Blog Post' : 'Create Blog Post'}
+                </h2>
                 <p className="text-blue-100 text-sm text-shadow-white-sm">
-                  Share your thoughts with the community
+                  {isEditMode ? 'Update your blog post' : 'Share your thoughts with the community'}
                 </p>
               </div>
             </div>
@@ -245,10 +277,10 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
               <Save className="w-4 h-4" />
               <span>
                 {isSubmitting 
-                  ? 'Saving...' 
+                  ? (isEditMode ? 'Updating...' : 'Saving...') 
                   : isPublished 
-                    ? 'Publish Post' 
-                    : 'Save Draft'
+                    ? (isEditMode ? 'Update Post' : 'Publish Post')
+                    : (isEditMode ? 'Save Changes' : 'Save Draft')
                 }
               </span>
             </button>

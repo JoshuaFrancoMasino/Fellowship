@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MessageCircle, User, Calendar, DollarSign, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { X, MessageCircle, User, Calendar, DollarSign, ChevronLeft, ChevronRight, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { MarketplaceItem } from '../../lib/supabase';
 import { socketService } from '../../lib/socket';
 
@@ -10,6 +10,9 @@ interface MarketplaceItemDetailModalProps {
   currentUser: string;
   isAuthenticated: boolean;
   onOpenChatWindow: () => void;
+  onEditItem: (item: MarketplaceItem) => void;
+  onDeleteItem: (itemId: string) => void;
+  isAdminUser: boolean;
 }
 
 const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
@@ -19,6 +22,9 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   currentUser,
   isAuthenticated,
   onOpenChatWindow,
+  onEditItem,
+  onDeleteItem,
+  isAdminUser,
 }) => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [contactMessage, setContactMessage] = useState('');
@@ -105,7 +111,19 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
     }
   };
 
+  const handleEditClick = () => {
+    onEditItem(item);
+    onClose();
+  };
+
+  const handleDeleteClick = () => {
+    onDeleteItem(item.id);
+    onClose();
+  };
+
   const isOwnListing = item.seller_username === currentUser;
+  const canEditItem = isOwnListing || isAdminUser;
+  const canDeleteItem = isOwnListing || isAdminUser;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -126,12 +144,36 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 icon-shadow-white-sm" />
-            </button>
+            <div className="flex items-center space-x-2">
+              {(canEditItem || canDeleteItem) && (
+                <div className="flex items-center space-x-2 mr-2">
+                  {canEditItem && (
+                    <button
+                      onClick={handleEditClick}
+                      className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                      title={isAdminUser && !isOwnListing ? "Edit listing (Admin)" : "Edit your listing"}
+                    >
+                      <Edit className="w-5 h-5 icon-shadow-white-sm" />
+                    </button>
+                  )}
+                  {canDeleteItem && (
+                    <button
+                      onClick={handleDeleteClick}
+                      className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                      title={isAdminUser && !isOwnListing ? "Delete listing (Admin)" : "Delete your listing"}
+                    >
+                      <Trash2 className="w-5 h-5 text-red-400 icon-shadow-white-sm" />
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 icon-shadow-white-sm" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -308,6 +350,18 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
                   <p className="text-blue-300 font-medium">This is your listing</p>
                   <p className="text-blue-200 text-sm mt-1">
                     Other users can contact you about this item
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Admin Indicator */}
+            {isAdminUser && !isOwnListing && (
+              <div className="border-t border-gray-700 pt-6">
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-center">
+                  <p className="text-red-300 font-medium">Admin View</p>
+                  <p className="text-red-200 text-sm mt-1">
+                    You have admin privileges to edit or delete this listing
                   </p>
                 </div>
               </div>

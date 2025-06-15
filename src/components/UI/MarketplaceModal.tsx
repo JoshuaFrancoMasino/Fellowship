@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter } from 'lucide-react';
-import { MarketplaceItem, getMarketplaceItems, supabase } from '../../lib/supabase';
+import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2 } from 'lucide-react';
+import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile } from '../../lib/supabase';
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
 import { socketService } from '../../lib/socket';
@@ -26,14 +26,32 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price-low' | 'price-high'>('newest');
   const [isCreateListingOpen, setIsCreateListingOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
+  const [itemToEdit, setItemToEdit] = useState<MarketplaceItem | null>(null);
   const [contactingItem, setContactingItem] = useState<string | null>(null);
   const [contactMessage, setContactMessage] = useState('');
+  const [isAdminUser, setIsAdminUser] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchItems();
+      checkAdminStatus();
     }
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated]);
+
+  const checkAdminStatus = async () => {
+    if (!isAuthenticated) {
+      setIsAdminUser(false);
+      return;
+    }
+
+    try {
+      const profile = await getCurrentUserProfile();
+      setIsAdminUser(profile?.role === 'admin');
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdminUser(false);
+    }
+  };
 
   const fetchItems = async () => {
     setLoading(true);
@@ -45,6 +63,36 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditItem = (item: MarketplaceItem) => {
+    setItemToEdit(item);
+    setIsCreateListingOpen(true);
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteMarketplaceItem(itemId);
+      fetchItems(); // Refresh the list
+      if (selectedItem?.id === itemId) {
+        setSelectedItem(null); // Close the detail view if it's the deleted item
+      }
+    } catch (error) {
+      console.error('Error deleting marketplace item:', error);
+      alert('Failed to delete listing. Please try again.');
+    }
+  };
+
+  const canEditItem = (item: MarketplaceItem) => {
+    return item.seller_username === currentUser || isAdminUser;
+  };
+
+  const canDeleteItem = (item: MarketplaceItem) => {
+    return item.seller_username === currentUser || isAdminUser;
   };
 
   const filteredAndSortedItems = items
@@ -280,8 +328,41 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Contact Section */}
-                      {item.seller_username !== currentUser && (
+                      {/* Action Buttons */}
+                      {(canEditItem(item) || canDeleteItem(item)) && item.seller_username === currentUser ? (
+                        // Own listing - show edit/delete buttons
+                        <div className="border-t border-gray-700 pt-4">
+                          <div className="flex space-x-2">
+                            {canEditItem(item) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditItem(item);
+                                }}
+                                className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-1"
+                                title={isAdminUser && item.seller_username !== currentUser ? "Edit listing (Admin)" : "Edit your listing"}
+                              >
+                                <Edit className="w-4 h-4" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {canDeleteItem(item) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteItem(item.id);
+                                }}
+                                className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-1"
+                                title={isAdminUser && item.seller_username !== currentUser ? "Delete listing (Admin)" : "Delete your listing"}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : item.seller_username !== currentUser ? (
+                        // Other's listing - show contact seller button
                         <div className="border-t border-gray-700 pt-4">
                           {contactingItem === item.id ? (
                             <div className="space-y-3">
@@ -338,15 +419,35 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                             </button>
                           )}
                         </div>
-                      )}
-
-                      {/* Own Item Indicator */}
-                      {item.seller_username === currentUser && (
-                        <div className="border-t border-gray-700 pt-4">
-                          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 text-center">
-                            <p className="text-blue-300 text-sm font-medium">Your Listing</p>
+                      ) : (
+                        // Admin actions for items they don't own
+                        isAdminUser && (
+                          <div className="border-t border-gray-700 pt-4">
+                            <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-center">
+                              <p className="text-red-300 text-sm font-medium mb-2">Admin Actions</p>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditItem(item);
+                                  }}
+                                  className="flex-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteItem(item.id);
+                                  }}
+                                  className="flex-1 px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -362,6 +463,9 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
               {!isAuthenticated && (
                 <span className="ml-2 text-blue-400">• Sign in to sell items</span>
               )}
+              {isAdminUser && (
+                <span className="ml-2 text-red-400">• Admin privileges enabled</span>
+              )}
             </div>
           </div>
         </div>
@@ -370,13 +474,18 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       {/* Create Listing Modal */}
       <CreateListingModal
         isOpen={isCreateListingOpen}
-        onClose={() => setIsCreateListingOpen(false)}
+        onClose={() => {
+          setIsCreateListingOpen(false);
+          setItemToEdit(null);
+        }}
         onSuccess={() => {
           setIsCreateListingOpen(false);
+          setItemToEdit(null);
           fetchItems();
         }}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
+        initialItem={itemToEdit}
       />
 
       {/* Item Detail Modal */}
@@ -387,6 +496,9 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
         onOpenChatWindow={onOpenChatWindow}
+        onEditItem={handleEditItem}
+        onDeleteItem={handleDeleteItem}
+        isAdminUser={isAdminUser}
       />
     </>
   );
