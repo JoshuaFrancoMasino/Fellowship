@@ -3,7 +3,7 @@ import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar
 import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile } from '../../lib/supabase';
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
-import { socketService } from '../../lib/socket';
+import { chatService } from '../../lib/chatService';
 
 interface MarketplaceModalProps {
   isOpen: boolean;
@@ -137,18 +137,23 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       return;
     }
 
-    // Send message through socket service
-    const success = socketService.sendPrivateMessage(
-      item.seller_username,
-      `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`
-    );
+    try {
+      // Send message through chat service
+      const success = await chatService.sendDirectMessage(
+        item.seller_username,
+        `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`
+      );
 
-    if (success) {
-      setContactingItem(null);
-      setContactMessage('');
-      onOpenChatWindow(item.seller_username);
-      alert('Message sent! Check your direct messages to continue the conversation.');
-    } else {
+      if (success) {
+        setContactingItem(null);
+        setContactMessage('');
+        onOpenChatWindow(item.seller_username);
+        alert('Message sent! Check your direct messages to continue the conversation.');
+      } else {
+        alert('Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
       alert('Failed to send message. Please try again.');
     }
   };

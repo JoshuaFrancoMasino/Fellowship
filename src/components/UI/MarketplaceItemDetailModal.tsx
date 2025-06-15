@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, MessageCircle, User, Calendar, DollarSign, ChevronLeft, ChevronRight, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { MarketplaceItem } from '../../lib/supabase';
-import { socketService } from '../../lib/socket';
+import { chatService } from '../../lib/chatService';
 
 interface MarketplaceItemDetailModalProps {
   isOpen: boolean;
@@ -70,8 +70,8 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
     setContactError(null);
 
     try {
-      // Send message through socket service
-      const success = socketService.sendPrivateMessage(
+      // Send message through chat service
+      const success = await chatService.sendDirectMessage(
         item.seller_username,
         `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`
       );
