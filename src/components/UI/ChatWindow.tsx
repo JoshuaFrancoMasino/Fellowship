@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, DatabaseX } from 'lucide-react';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, Database as DatabaseX } from 'lucide-react';
 import { chatService, ChatMessage } from '../../lib/chatService';
 
 interface ChatWindowProps {
