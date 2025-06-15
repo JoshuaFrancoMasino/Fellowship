@@ -203,8 +203,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         <div className="flex-1 overflow-y-auto">
           {/* Profile Header */}
           <div className="relative px-6 pb-6">
-            {/* Profile Picture - positioned directly below banner */}
-            <div className="absolute top-0 left-6">
+            {/* Profile Picture - increased gap from banner */}
+            <div className="absolute top-6 left-6">
               <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
@@ -255,8 +255,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               )}
             </div>
 
-            {/* Profile Info - increased top padding to account for profile picture */}
-            <div className="pt-28">
+            {/* Profile Info - increased top padding to account for larger gap */}
+            <div className="pt-32">
               <div className="flex items-center space-x-2 mb-2">
                 <h1 className="text-2xl font-bold text-gray-200">
                   {isAuthenticated && userProfile ? userProfile.username : `Guest ${username}`}
