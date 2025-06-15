@@ -51,6 +51,14 @@ export type Comment = {
   created_at: string;
 };
 
+export type ChatMessage = {
+  id: string;
+  pin_id: string;
+  username: string;
+  message: string;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   username: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, Wifi, WifiOff, User, AlertCircle, UserPlus, Lock } from 'lucide-react';
-import { socketService, ChatMessage, UserTyping } from '../../lib/socket';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, DatabaseX } from 'lucide-react';
+import { chatService, ChatMessage } from '../../lib/chatService';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -21,11 +21,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [recipientUsername, setRecipientUsername] = useState<string>(initialRecipientUsername);
   const [isConnected, setIsConnected] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const [isTyping, setIsTyping] = useState(false);
   const [messageError, setMessageError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Set initial recipient when modal opens
   useEffect(() => {
@@ -35,80 +33,55 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [isOpen, initialRecipientUsername]);
 
   useEffect(() => {
-    // Only connect if user is authenticated
-    if (isOpen && isAuthenticated && !socketService.isConnected()) {
-      connectToChat();
+    if (isOpen && isAuthenticated) {
+      initializeChat();
     }
 
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+      chatService.unsubscribeFromConversation();
     };
   }, [isOpen, currentUser, isAuthenticated]);
+
+  useEffect(() => {
+    if (recipientUsername && isConnected) {
+      loadConversation();
+    }
+  }, [recipientUsername, isConnected]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const connectToChat = () => {
-    const socket = socketService.connect(currentUser, isAuthenticated);
-    
-    if (socket) {
-      socket.on('connect', () => {
-        setIsConnected(true);
-        setMessageError('');
-      });
+  const initializeChat = () => {
+    chatService.initialize(currentUser, isAuthenticated);
+    setIsConnected(chatService.isConnected());
+    setMessageError('');
+  };
 
-      socket.on('disconnect', () => {
-        setIsConnected(false);
-      });
+  const loadConversation = async () => {
+    if (!recipientUsername.trim()) return;
 
-      socketService.onPrivateMessage((message: ChatMessage) => {
-        setMessages(prev => [...prev, message]);
-      });
+    setIsLoading(true);
+    try {
+      // Load existing messages
+      const existingMessages = await chatService.getConversationMessages(recipientUsername);
+      setMessages(existingMessages);
 
-      socketService.onMessageSent((data) => {
-        // Add sent message to local state
-        const sentMessage: ChatMessage = {
-          id: `sent_${Date.now()}`,
-          from: currentUser,
-          to: data.to,
-          message: data.message,
-          timestamp: data.timestamp
-        };
-        setMessages(prev => [...prev, sentMessage]);
-        setMessageError('');
-      });
-
-      socketService.onMessageError((error) => {
-        console.error('Message error:', error);
-        setMessageError(`Failed to send message: ${error.error}`);
-        setTimeout(() => setMessageError(''), 5000);
-      });
-
-      socketService.onUserTyping((data: UserTyping) => {
-        setTypingUsers(prev => {
-          const newSet = new Set(prev);
-          if (data.typing) {
-            newSet.add(data.from);
-          } else {
-            newSet.delete(data.from);
+      // Subscribe to new messages
+      chatService.subscribeToConversation(recipientUsername, (newMessage: ChatMessage) => {
+        setMessages(prev => {
+          // Avoid duplicates
+          if (prev.find(msg => msg.id === newMessage.id)) {
+            return prev;
           }
-          return newSet;
+          return [...prev, newMessage];
         });
-
-        // Clear typing indicator after 3 seconds
-        if (data.typing) {
-          setTimeout(() => {
-            setTypingUsers(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(data.from);
-              return newSet;
-            });
-          }, 3000);
-        }
       });
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      setMessageError('Failed to load conversation');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -116,14 +89,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !recipientUsername.trim() || !isConnected) return;
 
-    const success = socketService.sendPrivateMessage(recipientUsername.trim(), newMessage.trim());
-    
-    if (success) {
-      setNewMessage('');
-      stopTyping();
+    setIsLoading(true);
+    try {
+      const success = await chatService.sendDirectMessage(recipientUsername.trim(), newMessage.trim());
+      
+      if (success) {
+        setNewMessage('');
+        setMessageError('');
+        // Message will be added via the real-time subscription
+      } else {
+        setMessageError('Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setMessageError('Failed to send message');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -134,59 +118,49 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
-    
-    if (recipientUsername && e.target.value.trim() && !isTyping) {
-      startTyping();
-    } else if (!e.target.value.trim() && isTyping) {
-      stopTyping();
-    }
-  };
-
-  const startTyping = () => {
-    if (!isTyping && recipientUsername) {
-      setIsTyping(true);
-      socketService.startTyping(recipientUsername);
-      
-      // Clear existing timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      // Set timeout to stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping();
-      }, 2000);
-    }
-  };
-
-  const stopTyping = () => {
-    if (isTyping && recipientUsername) {
-      setIsTyping(false);
-      socketService.stopTyping(recipientUsername);
-      
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    }
-  };
-
-  const getConversationMessages = () => {
-    if (!recipientUsername) return [];
-    
-    return messages.filter(msg => 
-      (msg.from === currentUser && msg.to === recipientUsername) ||
-      (msg.from === recipientUsername && msg.to === currentUser)
-    ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  };
-
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  const formatDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      });
+    }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = (messages: ChatMessage[]) => {
+    const groups: { [key: string]: ChatMessage[] } = {};
+    
+    messages.forEach(message => {
+      const dateKey = new Date(message.created_at).toDateString();
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(message);
+    });
+
+    return Object.entries(groups).map(([date, msgs]) => ({
+      date,
+      messages: msgs
+    }));
   };
 
   if (!isOpen) return null;
@@ -223,7 +197,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 Authentication Required
               </h3>
               <p className="text-gray-400 leading-relaxed">
-                Sign up in order to access direct messaging service
+                Sign up to access direct messaging
               </p>
             </div>
 
@@ -234,10 +208,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               </div>
               <div className="flex items-center space-x-3 text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">
                 <User className="w-4 h-4 text-green-400 flex-shrink-0" />
-                <span>Real-time chat with typing indicators</span>
+                <span>Email-style messaging system</span>
               </div>
               <div className="flex items-center space-x-3 text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">
-                <Wifi className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <Database className="w-4 h-4 text-purple-400 flex-shrink-0" />
                 <span>Secure and reliable messaging</span>
               </div>
             </div>
@@ -279,9 +253,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               {isConnected ? (
-                <Wifi className="w-4 h-4 text-green-400 icon-shadow-white-sm" />
+                <Database className="w-4 h-4 text-green-400 icon-shadow-white-sm" />
               ) : (
-                <WifiOff className="w-4 h-4 text-red-400 icon-shadow-white-sm" />
+                <DatabaseX className="w-4 h-4 text-red-400 icon-shadow-white-sm" />
               )}
               <button
                 onClick={onClose}
@@ -300,7 +274,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               ? 'bg-green-900/30 text-green-300 border border-green-700' 
               : 'bg-red-900/30 text-red-300 border border-red-700'
           }`}>
-            {isConnected ? 'Connected' : 'Connecting...'}
+            {isConnected ? 'Connected to Supabase' : 'Not Connected'}
           </div>
         </div>
 
@@ -316,42 +290,56 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
             />
           </div>
-          {recipientUsername && typingUsers.has(recipientUsername) && (
-            <p className="text-xs text-blue-300 mt-2 ml-7 italic">
-              {recipientUsername} is typing...
-            </p>
-          )}
         </div>
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {recipientUsername ? (
             <>
-              {getConversationMessages().length === 0 ? (
+              {isLoading ? (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                  <p>Loading messages...</p>
+                </div>
+              ) : messages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No messages with {recipientUsername} yet</p>
                   <p className="text-sm">Start the conversation!</p>
                 </div>
               ) : (
-                getConversationMessages().map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.from === currentUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                        message.from === currentUser
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-200'
-                      }`}
-                    >
-                      <p className="text-sm">{message.message}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.from === currentUser ? 'text-blue-200' : 'text-gray-400'
-                      }`}>
-                        {formatTime(message.timestamp)}
-                      </p>
+                groupMessagesByDate(messages).map(({ date, messages: dayMessages }) => (
+                  <div key={date}>
+                    {/* Date separator */}
+                    <div className="flex items-center justify-center mb-4">
+                      <div className="bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-full">
+                        {formatDate(dayMessages[0].created_at)}
+                      </div>
+                    </div>
+                    
+                    {/* Messages for this date */}
+                    <div className="space-y-3">
+                      {dayMessages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                              message.username === currentUser
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-200'
+                            }`}
+                          >
+                            <p className="text-sm">{message.message}</p>
+                            <p className={`text-xs mt-1 ${
+                              message.username === currentUser ? 'text-blue-200' : 'text-gray-400'
+                            }`}>
+                              {formatTime(message.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))
@@ -385,25 +373,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <input
               type="text"
               value={newMessage}
-              onChange={handleInputChange}
+              onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={recipientUsername ? `Message ${recipientUsername}...` : "Enter a username above first..."}
-              disabled={!isConnected || !recipientUsername.trim()}
+              disabled={!isConnected || !recipientUsername.trim() || isLoading}
               className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
             />
             <button
               onClick={handleSendMessage}
-              disabled={!newMessage.trim() || !recipientUsername.trim() || !isConnected}
+              disabled={!newMessage.trim() || !recipientUsername.trim() || !isConnected || isLoading}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
             >
-              <Send className="w-4 h-4" />
+              {isLoading ? (
+                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
               <span className="hidden sm:inline">Send</span>
             </button>
           </div>
           
           {!isConnected && (
             <p className="text-xs text-red-400 mt-2">
-              Disconnected from chat server. Trying to reconnect...
+              Not connected to Supabase. Please check your configuration.
             </p>
           )}
         </div>
