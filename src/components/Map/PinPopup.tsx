@@ -32,6 +32,9 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
+
   useEffect(() => {
     console.log('🔄 PinPopup useEffect triggered for pin:', pin.id);
     fetchComments();
@@ -118,7 +121,6 @@ const PinPopup: React.FC<PinPopupProps> = ({
 
   const canDelete = pin.username === currentUser || isAdmin;
   const canEdit = pin.username === currentUser || isAdmin;
-  const isGuestUser = pin.username.match(/^\d{7}$/);
 
   // Calculate total likes across all images
   const totalLikes = Object.values(likes).reduce((sum, count) => sum + count, 0);
@@ -139,6 +141,13 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const handleEditClick = () => {
     if (onEdit) {
       onEdit(pin);
+    }
+  };
+
+  const handleUserProfileClick = (username: string) => {
+    // Only allow profile clicks for non-guest users
+    if (!isGuestUser(username)) {
+      onOpenUserProfile(username);
     }
   };
 
@@ -179,19 +188,35 @@ const PinPopup: React.FC<PinPopupProps> = ({
       <div className="glass-header p-4 text-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onOpenUserProfile(pin.username)}
-              className="w-8 h-8 glass-white rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
-            >
-              <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
-            </button>
-            <div>
+            {isGuestUser(pin.username) ? (
+              // Non-clickable version for guest users
+              <div className="w-8 h-8 glass-white rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
+              </div>
+            ) : (
+              // Clickable version for authenticated users
               <button
-                onClick={() => onOpenUserProfile(pin.username)}
-                className="font-semibold text-sm hover:underline transition-all text-shadow-white-sm"
+                onClick={() => handleUserProfileClick(pin.username)}
+                className="w-8 h-8 glass-white rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
               >
-                Guest {pin.username}
+                <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
               </button>
+            )}
+            <div>
+              {isGuestUser(pin.username) ? (
+                // Non-clickable version for guest users
+                <span className="font-semibold text-sm text-shadow-white-sm cursor-default">
+                  Guest {pin.username}
+                </span>
+              ) : (
+                // Clickable version for authenticated users
+                <button
+                  onClick={() => handleUserProfileClick(pin.username)}
+                  className="font-semibold text-sm hover:underline transition-all text-shadow-white-sm"
+                >
+                  Guest {pin.username}
+                </button>
+              )}
               <p className="text-xs opacity-90 text-shadow-white-sm">{formatDate(pin.created_at)}</p>
             </div>
           </div>
@@ -325,15 +350,22 @@ const PinPopup: React.FC<PinPopupProps> = ({
         {/* Comments list */}
         <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
           {comments.map((comment) => {
-            const isCommentFromGuest = comment.username.match(/^\d{7}$/);
             return (
               <div key={comment.id} className="text-sm">
-                <button
-                  onClick={() => onOpenUserProfile(comment.username)}
-                  className="font-medium text-blue-400 hover:underline"
-                >
-                  Guest {comment.username}
-                </button>
+                {isGuestUser(comment.username) ? (
+                  // Non-clickable version for guest users
+                  <span className="font-medium text-blue-400 cursor-default">
+                    Guest {comment.username}
+                  </span>
+                ) : (
+                  // Clickable version for authenticated users
+                  <button
+                    onClick={() => handleUserProfileClick(comment.username)}
+                    className="font-medium text-blue-400 hover:underline"
+                  >
+                    Guest {comment.username}
+                  </button>
+                )}
                 <span className="text-gray-200 ml-2">{comment.text}</span>
               </div>
             );

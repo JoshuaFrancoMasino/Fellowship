@@ -45,6 +45,9 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     localities: [] as string[],
   });
 
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
+
   useEffect(() => {
     if (isOpen) {
       fetchEngagementData();
@@ -190,6 +193,13 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
   };
 
   const hasActiveLocationFilters = Object.values(locationFilters).some(filter => filter !== '');
+
+  const handleUserProfileClick = (username: string) => {
+    // Only allow profile clicks for non-guest users
+    if (!isGuestUser(username)) {
+      onOpenUserProfile(username);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -412,7 +422,6 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredAndSortedPins.map((pin) => {
-                const isGuestUser = pin.username.match(/^\d{7}$/);
                 const likeCount = likeCounts[pin.id] || 0;
                 const commentCount = commentCounts[pin.id] || 0;
 
@@ -451,19 +460,35 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                     <div className="p-4">
                       {/* User Info */}
                       <div className="flex items-center space-x-2 mb-3">
-                        <button
-                          onClick={() => onOpenUserProfile(pin.username)}
-                          className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform"
-                        >
-                          <User className="w-4 h-4 text-white" />
-                        </button>
-                        <div className="flex-1">
+                        {isGuestUser(pin.username) ? (
+                          // Non-clickable version for guest users
+                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <User className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          // Clickable version for authenticated users
                           <button
-                            onClick={() => onOpenUserProfile(pin.username)}
-                            className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
+                            onClick={() => handleUserProfileClick(pin.username)}
+                            className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform"
                           >
-                            Guest {pin.username}
+                            <User className="w-4 h-4 text-white" />
                           </button>
+                        )}
+                        <div className="flex-1">
+                          {isGuestUser(pin.username) ? (
+                            // Non-clickable version for guest users
+                            <span className="font-medium text-sm text-gray-200 cursor-default">
+                              Guest {pin.username}
+                            </span>
+                          ) : (
+                            // Clickable version for authenticated users
+                            <button
+                              onClick={() => handleUserProfileClick(pin.username)}
+                              className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
+                            >
+                              Guest {pin.username}
+                            </button>
+                          )}
                           <p className="text-xs text-gray-400">{formatDate(pin.created_at)}</p>
                         </div>
                       </div>

@@ -64,8 +64,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       const pins = await getUserPins(username);
       setUserPins(pins);
 
-      // Fetch complete profile data if authenticated
-      if (isAuthenticated) {
+      // Only fetch complete profile data for authenticated users, and skip guest users
+      if (isAuthenticated && !isGuestUser) {
         let profile = null;
         if (isOwnProfile) {
           profile = await getCurrentUserProfile();
@@ -73,6 +73,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           profile = await getProfileByUsername(username);
         }
         setUserProfile(profile);
+      } else if (isGuestUser) {
+        // Create a mock profile for guest users to avoid database queries
+        const mockProfile = {
+          id: null,
+          username: username,
+          role: 'guest',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          contact_info: null,
+          about_me: null,
+          profile_picture_url: null,
+          banner_url: null
+        };
+        setUserProfile(mockProfile);
       }
     } catch (error) {
       console.error('Error fetching profile data:', error);
@@ -95,14 +109,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const handleProfilePictureClick = () => {
-    if (isOwnProfile && isAuthenticated && fileInputRef.current) {
+    if (isOwnProfile && isAuthenticated && !isGuestUser && fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !isAuthenticated || !userProfile) return;
+    if (!file || !isAuthenticated || !userProfile || isGuestUser) return;
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -185,7 +199,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div className="text-center text-white">
               <User className="w-8 h-8 mx-auto mb-2 opacity-70 icon-shadow-white-sm" />
               <p className="text-sm opacity-70 text-shadow-white-sm">
-                {isAuthenticated && isOwnProfile ? 'Your Profile' : 'Guest Profile'}
+                {isAuthenticated && isOwnProfile && !isGuestUser ? 'Your Profile' : 'Guest Profile'}
               </p>
             </div>
           </div>
@@ -208,14 +222,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="w-24 h-24 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
-                  disabled={!isOwnProfile || !isAuthenticated || isUploadingProfilePicture}
+                  disabled={!isOwnProfile || !isAuthenticated || isUploadingProfilePicture || isGuestUser}
                   className={`
                     w-full h-full rounded-full glass-header flex items-center justify-center relative overflow-hidden group
-                    ${isOwnProfile && isAuthenticated ? 'cursor-pointer hover:bg-blue-600/20 transition-colors' : 'cursor-default'}
+                    ${isOwnProfile && isAuthenticated && !isGuestUser ? 'cursor-pointer hover:bg-blue-600/20 transition-colors' : 'cursor-default'}
                   `}
                 >
                   {/* Profile Picture or Default Icon */}
-                  {userProfile?.profile_picture_url ? (
+                  {userProfile?.profile_picture_url && !isGuestUser ? (
                     <img
                       src={userProfile.profile_picture_url}
                       alt="Profile"
@@ -225,8 +239,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <User className="w-8 h-8 text-white icon-shadow-white-md" />
                   )}
 
-                  {/* Upload Overlay - Only show for own profile when authenticated */}
-                  {isOwnProfile && isAuthenticated && (
+                  {/* Upload Overlay - Only show for own profile when authenticated and not guest */}
+                  {isOwnProfile && isAuthenticated && !isGuestUser && (
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-full">
                       {isUploadingProfilePicture ? (
                         <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -248,7 +262,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
               
               {/* Upload hint text for own profile */}
-              {isOwnProfile && isAuthenticated && (
+              {isOwnProfile && isAuthenticated && !isGuestUser && (
                 <p className="text-xs text-gray-400 text-center mt-2">
                   Click to change picture
                 </p>
@@ -259,15 +273,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div className="pt-32">
               <div className="flex items-center space-x-2 mb-2">
                 <h1 className="text-2xl font-bold text-gray-200">
-                  {isAuthenticated && userProfile ? userProfile.username : `Guest ${username}`}
+                  {isAuthenticated && userProfile && !isGuestUser ? userProfile.username : `Guest ${username}`}
                 </h1>
               </div>
               <p className="text-gray-400 text-sm mb-4">
-                {isAuthenticated && isOwnProfile ? 'Authenticated user' : 'Guest user'}
+                {isAuthenticated && isOwnProfile && !isGuestUser ? 'Authenticated user' : 'Guest user'}
               </p>
 
               {/* Username Settings - Only for authenticated users viewing their own profile */}
-              {isOwnProfile && isAuthenticated && (
+              {isOwnProfile && isAuthenticated && !isGuestUser && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-lg font-semibold text-gray-200 flex items-center space-x-2">
@@ -327,7 +341,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               )}
 
               {/* Guest Username Display - For guests viewing their own profile */}
-              {isOwnProfile && !isAuthenticated && (
+              {isOwnProfile && (!isAuthenticated || isGuestUser) && (
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-200 mb-3 flex items-center space-x-2">
                     <Settings className="w-5 h-5" />
