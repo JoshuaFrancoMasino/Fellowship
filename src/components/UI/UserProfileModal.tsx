@@ -317,7 +317,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         )}
 
         {/* Banner Section */}
-        <div className="relative h-48 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
+        <div className="relative h-32 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
           {/* Banner Image */}
           {userProfile?.banner_url && !isGuestUser ? (
             <img
@@ -366,11 +366,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Scrollable Content Container */}
-        <div className="flex-1 overflow-y-auto max-h-[calc(90vh-320px)]">
+        <div className="flex-1 overflow-y-auto max-h-[calc(90vh-256px)]">
           {/* Profile Header */}
           <div className="relative px-6 pb-6">
             {/* Profile Picture - overlapping banner */}
-            <div className="absolute top-12 left-6">
+            <div className="absolute -top-16 left-6">
               <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
@@ -415,7 +415,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
 
             {/* Profile Info - adjusted for larger profile picture */}
-            <div className="pt-44 ml-48">
+            <div className="pt-20 ml-40">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
