@@ -15,6 +15,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
+  const [showPasswordResetSent, setShowPasswordResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +56,74 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
       setLoading(false);
     }
   };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    setResetLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) throw error;
+      
+      setShowPasswordResetSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send password reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Show password reset confirmation screen
+  if (showPasswordResetSent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-4">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.1%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]"></div>
+        </div>
+
+        <div className="relative w-full max-w-md">
+          <div className="bg-gray-900 rounded-3xl shadow-2xl p-8 border border-gray-700 text-center">
+            <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Mail className="w-10 h-10 text-white" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-200 mb-4">Password Reset Sent</h2>
+            
+            <p className="text-gray-400 mb-6">
+              We've sent a password reset link to <strong className="text-gray-200">{email}</strong>. 
+              Please check your email and follow the instructions to reset your password.
+            </p>
+            
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+              <p className="text-blue-300 text-sm">
+                The reset link will expire in 1 hour. If you don't see the email, check your spam folder.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowPasswordResetSent(false);
+                setEmail('');
+                setPassword('');
+              }}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show email confirmation screen
   if (showEmailConfirmation) {
@@ -212,6 +282,20 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
                 />
               </div>
+              
+              {/* Forgot Password Button - Only show during sign in */}
+              {!isSignUp && (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={resetLoading}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resetLoading ? 'Sending...' : 'Forgot password?'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Opt-in checkbox - Only show during sign up */}
