@@ -261,54 +261,58 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto max-h-[calc(90vh-256px)]">
           {/* Profile Header */}
-          <div className="relative px-6 pb-6">
-            {/* Profile Picture - overlapping banner */}
-            <div className="absolute -top-16 left-6">
-              <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg">
-                <button
-                  onClick={handleProfilePictureClick}
-                  disabled={!isOwnProfile || !isAuthenticated || isUploadingProfilePicture || isGuestUser}
-                  className={`
-                    w-full h-full rounded-full glass-header flex items-center justify-center relative overflow-hidden group
-                    ${isOwnProfile && isAuthenticated && !isGuestUser ? 'cursor-pointer hover:bg-blue-600/20 transition-colors' : 'cursor-default'}
-                  `}
-                >
-                  {/* Profile Picture or Default Icon */}
-                  {userProfile?.profile_picture_url && !isGuestUser ? (
-                    <img
-                      src={userProfile.profile_picture_url}
-                      alt="Profile"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-white icon-shadow-white-md" />
-                  )}
+          <div className="px-6 pb-6 -mt-16 flex items-center space-x-4">
+            {/* Profile Picture */}
+            <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg flex-shrink-0">
+              <button
+                onClick={handleProfilePictureClick}
+                disabled={!isOwnProfile || !isAuthenticated || isUploadingProfilePicture || isGuestUser}
+                className={`
+                  w-full h-full rounded-full flex items-center justify-center relative overflow-hidden group
+                  ${isOwnProfile && isAuthenticated && !isGuestUser ? 'cursor-pointer hover:bg-blue-600/20 transition-colors' : 'cursor-default'}
+                `}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15))',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
+                }}
+              >
+                {/* Profile Picture or Default Icon */}
+                {userProfile?.profile_picture_url && !isGuestUser ? (
+                  <img
+                    src={userProfile.profile_picture_url}
+                    alt="Profile"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <User className="w-12 h-12 text-white icon-shadow-white-md" />
+                )}
 
-                  {/* Upload Overlay - Only show for own profile when authenticated and not guest */}
-                  {isOwnProfile && isAuthenticated && !isGuestUser && (
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-full">
-                      {isUploadingProfilePicture ? (
-                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <Camera className="w-8 h-8 text-white" />
-                      )}
-                    </div>
-                  )}
-                </button>
+                {/* Upload Overlay - Only show for own profile when authenticated and not guest */}
+                {isOwnProfile && isAuthenticated && !isGuestUser && (
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-full">
+                    {isUploadingProfilePicture ? (
+                      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Camera className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                )}
+              </button>
 
-                {/* Hidden Profile Picture File Input */}
-                <input
-                  ref={profilePictureInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureChange}
-                  className="hidden"
-                />
-              </div>
+              {/* Hidden Profile Picture File Input */}
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                className="hidden"
+              />
             </div>
 
-            {/* Profile Info - adjusted for larger profile picture */}
-            <div className="pt-20 ml-48">
+            {/* Profile Info */}
+            <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
