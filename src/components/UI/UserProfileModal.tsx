@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus } from 'lucide-react';
+import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText } from 'lucide-react';
 import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase } from '../../lib/supabase';
 
 interface UserProfileModalProps {
@@ -236,6 +236,39 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     });
   };
 
+  // Helper function to detect if a URL is valid
+  const isValidUrl = (string: string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // Helper function to format contact info for display
+  const formatContactInfo = (contactInfo: string) => {
+    if (!contactInfo) return null;
+    
+    // If it looks like a URL, make it clickable
+    if (isValidUrl(contactInfo)) {
+      return (
+        <a
+          href={contactInfo}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 transition-colors underline flex items-center space-x-1"
+        >
+          <Globe className="w-4 h-4" />
+          <span>{contactInfo}</span>
+        </a>
+      );
+    }
+    
+    // Otherwise, just display as text
+    return <span className="text-gray-200">{contactInfo}</span>;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -380,19 +413,30 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* About Me Section */}
             {(userProfile?.about_me || isEditingProfile) && !isGuestUser && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-200 mb-3">About</h3>
+                <h3 className="text-lg font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <FileText className="w-5 h-5" />
+                  <span>About Me</span>
+                </h3>
                 {isEditingProfile && isOwnProfile ? (
-                  <textarea
-                    value={editAboutMe}
-                    onChange={(e) => setEditAboutMe(e.target.value)}
-                    placeholder="Tell others about yourself..."
-                    maxLength={1000}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 resize-none"
-                  />
+                  <div>
+                    <textarea
+                      value={editAboutMe}
+                      onChange={(e) => setEditAboutMe(e.target.value)}
+                      placeholder="Tell others about yourself, your interests, background, or anything you'd like to share..."
+                      maxLength={1000}
+                      rows={5}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 resize-none"
+                    />
+                    <div className="text-xs text-gray-400 mt-1">
+                      {editAboutMe.length}/1000 characters
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 Share your story, hobbies, professional background, or what makes you unique!
+                    </p>
+                  </div>
                 ) : (
                   <div className="bg-gray-800 rounded-lg p-4">
-                    <p className="text-gray-200 leading-relaxed">
+                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">
                       {userProfile?.about_me || 'No description provided yet.'}
                     </p>
                   </div>
@@ -400,24 +444,39 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             )}
 
-            {/* Contact Info Section */}
+            {/* Website/Contact Section */}
             {(userProfile?.contact_info || isEditingProfile) && !isGuestUser && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-200 mb-3">Contact</h3>
+                <h3 className="text-lg font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <Globe className="w-5 h-5" />
+                  <span>Website & Contact</span>
+                </h3>
                 {isEditingProfile && isOwnProfile ? (
-                  <input
-                    type="text"
-                    value={editContactInfo}
-                    onChange={(e) => setEditContactInfo(e.target.value)}
-                    placeholder="Your contact information (email, social media, etc.)"
-                    maxLength={500}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      value={editContactInfo}
+                      onChange={(e) => setEditContactInfo(e.target.value)}
+                      placeholder="Your website, social media, email, or other contact information"
+                      maxLength={500}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                    />
+                    <div className="text-xs text-gray-400 mt-1">
+                      {editContactInfo.length}/500 characters
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 Add your website URL, social media profiles, or preferred contact method
+                    </p>
+                  </div>
                 ) : (
                   <div className="bg-gray-800 rounded-lg p-4">
-                    <p className="text-gray-200">
-                      {userProfile?.contact_info || 'No contact information provided.'}
-                    </p>
+                    <div className="text-gray-200">
+                      {userProfile?.contact_info ? (
+                        formatContactInfo(userProfile.contact_info)
+                      ) : (
+                        'No contact information provided.'
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -516,16 +575,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Authentication Button for Current User */}
             {isOwnProfile && !isAuthenticated && (
               <div className="mb-6">
-                <button
-                  onClick={handleSignupClick}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
-                >
-                  <UserPlus className="w-5 h-5" />
-                  <span>Sign Up / Sign In</span>
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-2">
-                  Create an account to customize your profile and access more features
-                </p>
+                <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-blue-700 rounded-lg p-6">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-blue-300 mb-2">
+                      Unlock Full Profile Features
+                    </h3>
+                    <p className="text-blue-200 text-sm">
+                      Sign up to add your description, website, profile picture, and connect with the community
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="flex items-center space-x-2 text-sm text-blue-200">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      <span>Personal description</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-blue-200">
+                      <Globe className="w-4 h-4 text-blue-400" />
+                      <span>Website & contact info</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-blue-200">
+                      <Camera className="w-4 h-4 text-blue-400" />
+                      <span>Profile picture</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-blue-200">
+                      <MessageCircle className="w-4 h-4 text-blue-400" />
+                      <span>Direct messaging</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSignupClick}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    <span>Sign Up / Sign In</span>
+                  </button>
+                </div>
               </div>
             )}
 
