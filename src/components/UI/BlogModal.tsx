@@ -108,8 +108,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
   };
 
   const truncateContent = (content: string, maxLength: number = 150) => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
+    // Strip HTML tags for preview
+    const textContent = content.replace(/<[^>]*>/g, '');
+    if (textContent.length <= maxLength) return textContent;
+    return textContent.substring(0, maxLength) + '...';
   };
 
   const canDeletePost = (post: BlogPost) => {
@@ -177,9 +179,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
           {/* Post Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
             <div className="prose prose-invert max-w-none">
-              <div className="whitespace-pre-wrap text-gray-200 leading-relaxed">
-                {selectedPost.content}
-              </div>
+              <div 
+                className="text-gray-200 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: selectedPost.content }}
+              />
             </div>
             
             {/* Post Stats */}

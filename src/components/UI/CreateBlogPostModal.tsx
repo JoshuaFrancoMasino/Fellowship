@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Save, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { createBlogPost, updateBlogPost, BlogPost } from '../../lib/supabase';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, BookOpen, Save, Eye, EyeOff, AlertCircle, Image, Video, Upload } from 'lucide-react';
+import { createBlogPost, updateBlogPost, BlogPost, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
 
 interface CreateBlogPostModalProps {
   isOpen: boolean;
@@ -24,6 +24,12 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
   const [isPublished, setIsPublished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showVideoInput, setShowVideoInput] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditMode = !!initialPost;
 
@@ -40,6 +46,8 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
       setIsPublished(false);
     }
     setSubmitError(null);
+    setShowVideoInput(false);
+    setVideoUrl('');
   }, [initialPost]);
 
   const resetForm = () => {
@@ -47,6 +55,116 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     setContent('');
     setIsPublished(false);
     setSubmitError(null);
+    setShowVideoInput(false);
+    setVideoUrl('');
+  };
+
+  const insertAtCursor = (textToInsert: string) => {
+    if (!textareaRef.current) return;
+
+    const textarea = textareaRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const newContent = content.substring(0, start) + textToInsert + content.substring(end);
+    setContent(newContent);
+    
+    // Set cursor position after inserted text
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+    }, 0);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !isAuthenticated) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const profile = await getCurrentUserProfile();
+      if (!profile) {
+        alert('Please sign in to upload images');
+        return;
+      }
+
+      // Upload image to blog-images bucket
+      const path = await uploadImage(file, profile.id, 'blog-images');
+      
+      if (!path) {
+        throw new Error('Failed to upload image');
+      }
+
+      // Get public URL
+      const publicUrl = getImageUrl(path, 'blog-images');
+      
+      // Insert image HTML at cursor position
+      const imageHtml = `<img src="${publicUrl}" alt="Blog image" style="max-width: 100%; height: auto; margin: 10px 0;" />`;
+      insertAtCursor(imageHtml);
+      
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingImage(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const parseVideoUrl = (url: string): string | null => {
+    // YouTube URL patterns
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const youtubeMatch = url.match(youtubeRegex);
+    
+    if (youtubeMatch) {
+      const videoId = youtubeMatch[1];
+      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width: 100%; margin: 10px 0;"></iframe>`;
+    }
+
+    // Vimeo URL patterns
+    const vimeoRegex = /(?:vimeo\.com\/)([0-9]+)/;
+    const vimeoMatch = url.match(vimeoRegex);
+    
+    if (vimeoMatch) {
+      const videoId = vimeoMatch[1];
+      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="max-width: 100%; margin: 10px 0;"></iframe>`;
+    }
+
+    return null;
+  };
+
+  const handleEmbedVideo = () => {
+    if (!videoUrl.trim()) {
+      alert('Please enter a video URL');
+      return;
+    }
+
+    const videoEmbed = parseVideoUrl(videoUrl.trim());
+    
+    if (!videoEmbed) {
+      alert('Please enter a valid YouTube or Vimeo URL');
+      return;
+    }
+
+    insertAtCursor(videoEmbed);
+    setVideoUrl('');
+    setShowVideoInput(false);
   };
 
   const handleSubmit = async () => {
@@ -208,6 +326,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
               Content *
             </label>
             <textarea
+              ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Write your blog post content here..."
@@ -217,6 +336,93 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
             />
             <div className="text-xs text-gray-400 mt-1">
               {content.length}/10,000 characters
+            </div>
+
+            {/* Media Buttons */}
+            <div className="mt-3 flex flex-wrap gap-3">
+              {/* Image Upload Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                {isUploadingImage ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image className="w-4 h-4" />
+                )}
+                <span>{isUploadingImage ? 'Uploading...' : 'Upload Image'}</span>
+              </button>
+
+              {/* Video Embed Button */}
+              <button
+                type="button"
+                onClick={() => setShowVideoInput(!showVideoInput)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <Video className="w-4 h-4" />
+                <span>Embed Video</span>
+              </button>
+
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </div>
+
+            {/* Video URL Input */}
+            {showVideoInput && (
+              <div className="mt-3 p-4 bg-gray-800 border border-gray-700 rounded-lg">
+                <label className="block text-sm font-medium text-gray-200 mb-2">
+                  Video URL (YouTube or Vimeo)
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleEmbedVideo}
+                    disabled={!videoUrl.trim()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Add Video
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowVideoInput(false);
+                      setVideoUrl('');
+                    }}
+                    className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-gray-200 rounded-lg transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Paste a YouTube or Vimeo URL to embed the video in your blog post
+                </p>
+              </div>
+            )}
+
+            {/* Media Instructions */}
+            <div className="mt-3 text-xs text-gray-400">
+              <p>💡 <strong>Tips:</strong></p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Click "Upload Image" to add photos directly from your device</li>
+                <li>Click "Embed Video" to add YouTube or Vimeo videos</li>
+                <li>Images and videos will be inserted at your cursor position</li>
+                <li>You can mix text, images, and videos in any order</li>
+              </ul>
             </div>
           </div>
 
@@ -271,7 +477,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!title.trim() || !content.trim() || isSubmitting}
+              disabled={!title.trim() || !content.trim() || isSubmitting || isUploadingImage}
               className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center space-x-2"
             >
               <Save className="w-4 h-4" />
