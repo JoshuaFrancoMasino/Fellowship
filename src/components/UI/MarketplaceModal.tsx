@@ -12,6 +12,7 @@ interface MarketplaceModalProps {
   isAuthenticated: boolean;
   onOpenChatWindow: (recipientUsername?: string) => void;
   onOpenUserProfile: (username: string) => void;
+  initialItem?: MarketplaceItem | null;
 }
 
 const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
@@ -21,6 +22,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   isAuthenticated,
   onOpenChatWindow,
   onOpenUserProfile,
+  initialItem = null,
 }) => {
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,8 +44,13 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
     if (isOpen) {
       fetchItems();
       checkAdminStatus();
+
+      // If initialItem is provided, set it as selected
+      if (initialItem) {
+        setSelectedItem(initialItem);
+      }
     }
-  }, [isOpen, isAuthenticated]);
+  }, [isOpen, isAuthenticated, initialItem]);
 
   useEffect(() => {
     if (items.length > 0) {

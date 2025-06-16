@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText } from 'lucide-react';
-import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase } from '../../lib/supabase';
+import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText, BookOpen, ShoppingBag } from 'lucide-react';
+import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase, BlogPost, MarketplaceItem, getUserBlogPosts, getUserMarketplaceItems } from '../../lib/supabase';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -8,6 +8,8 @@ interface UserProfileModalProps {
   username: string;
   currentUser: string;
   onSelectPin: (pinId: string) => void;
+  onSelectBlogPost: (post: BlogPost) => void;
+  onSelectMarketplaceItem: (item: MarketplaceItem) => void;
   onUsernameChange: (newUsername: string) => void;
   isCurrentUserAdmin?: boolean;
   onOpenChatWindow: (recipientUsername?: string) => void;
@@ -19,17 +21,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   username,
   currentUser,
   onSelectPin,
+  onSelectBlogPost,
+  onSelectMarketplaceItem,
   onUsernameChange,
   isCurrentUserAdmin = false,
   onOpenChatWindow,
 }) => {
   const [userPins, setUserPins] = useState<Pin[]>([]);
+  const [userBlogPosts, setUserBlogPosts] = useState<BlogPost[]>([]);
+  const [userMarketplaceItems, setUserMarketplaceItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPinsExpanded, setIsPinsExpanded] = useState(false);
+  const [isBlogPostsExpanded, setIsBlogPostsExpanded] = useState(false);
+  const [isMarketplaceItemsExpanded, setIsMarketplaceItemsExpanded] = useState(false);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editAboutMe, setEditAboutMe] = useState('');
@@ -67,8 +75,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const fetchProfileData = async () => {
     setLoading(true);
     try {
+      // Fetch pins
       const pins = await getUserPins(username);
       setUserPins(pins);
+
+      // Fetch blog posts
+      const blogPosts = await getUserBlogPosts(username);
+      setUserBlogPosts(blogPosts);
+
+      // Fetch marketplace items
+      const marketplaceItems = await getUserMarketplaceItems(username);
+      setUserMarketplaceItems(marketplaceItems);
 
       // Only fetch complete profile data for authenticated users, and skip guest users
       if (!isGuestUser) {
@@ -236,6 +253,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     });
   };
 
+  const formatItemDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   // Helper function to detect if a URL is valid
   const isValidUrl = (string: string) => {
     try {
@@ -267,6 +293,18 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     
     // Otherwise, just display as text
     return <span className="text-gray-200">{contactInfo}</span>;
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price);
+  };
+
+  const truncateText = (text: string, maxLength: number = 100) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   if (!isOpen) return null;
@@ -368,6 +406,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-400">{userPins.length}</div>
                       <div className="text-sm text-gray-400">Pins</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-400">{userBlogPosts.length}</div>
+                      <div className="text-sm text-gray-400">Posts</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-400">{userMarketplaceItems.length}</div>
+                      <div className="text-sm text-gray-400">Items</div>
                     </div>
                     {userProfile?.created_at && (
                       <div className="text-center">
@@ -615,11 +661,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             )}
 
-            {/* Pins Section */}
-            <div>
-              {/* Collapsible Pins Section */}
+            {/* Content Sections */}
+            <div className="space-y-4">
+              {/* Pins Section */}
               <div>
-                {/* Clickable Header */}
                 <button
                   onClick={() => setIsPinsExpanded(!isPinsExpanded)}
                   className="w-full flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors mb-4 group"
@@ -637,7 +682,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   />
                 </button>
                 
-                {/* Collapsible Pin List */}
                 {isPinsExpanded && (
                   <div className="animate-fadeInUp">
                     {userPins.length === 0 ? (
@@ -669,22 +713,161 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                   {pin.description}
                                 </p>
                                 <p className="text-xs text-gray-400 mb-2">
-                                  {new Date(pin.created_at).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
+                                  {formatItemDate(pin.created_at)}
                                 </p>
                                 <p className="text-xs text-gray-500 mb-3">
                                   {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
                                 </p>
                                 
-                                {/* View on Map indicator */}
                                 <div className="flex items-center space-x-2 text-blue-400 group-hover:text-blue-300 transition-colors">
                                   <MapPin className="w-4 h-4" />
                                   <span className="text-xs font-medium">View on Map</span>
                                   <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform duration-200" />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Blog Posts Section */}
+              <div>
+                <button
+                  onClick={() => setIsBlogPostsExpanded(!isBlogPostsExpanded)}
+                  className="w-full flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors mb-4 group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <BookOpen className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                    <h3 className="text-lg font-semibold text-gray-200 group-hover:text-gray-100 transition-colors">
+                      Blog Posts ({userBlogPosts.length})
+                    </h3>
+                  </div>
+                  <ChevronDown 
+                    className={`w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-all duration-200 ${
+                      isBlogPostsExpanded ? 'rotate-180' : ''
+                    }`} 
+                  />
+                </button>
+                
+                {isBlogPostsExpanded && (
+                  <div className="animate-fadeInUp">
+                    {userBlogPosts.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No blog posts yet</p>
+                        {isOwnProfile && (
+                          <p className="text-sm">Start writing to share your thoughts!</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {userBlogPosts.map((post) => (
+                          <button
+                            key={post.id}
+                            onClick={() => onSelectBlogPost(post)}
+                            className="w-full bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left transition-all duration-200 group border border-gray-700 hover:border-gray-600"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="text-sm font-semibold text-gray-200 line-clamp-1 group-hover:text-gray-100 transition-colors">
+                                {post.title}
+                              </h4>
+                              {!post.is_published && (
+                                <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full flex-shrink-0">
+                                  Draft
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-300 line-clamp-2 mb-3">
+                              {post.excerpt || truncateText(post.content)}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-gray-400">
+                                {formatItemDate(post.created_at)}
+                              </p>
+                              <div className="flex items-center space-x-2 text-purple-400 group-hover:text-purple-300 transition-colors">
+                                <BookOpen className="w-4 h-4" />
+                                <span className="text-xs font-medium">Read Post</span>
+                                <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform duration-200" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Marketplace Items Section */}
+              <div>
+                <button
+                  onClick={() => setIsMarketplaceItemsExpanded(!isMarketplaceItemsExpanded)}
+                  className="w-full flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors mb-4 group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <ShoppingBag className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                    <h3 className="text-lg font-semibold text-gray-200 group-hover:text-gray-100 transition-colors">
+                      Marketplace Items ({userMarketplaceItems.length})
+                    </h3>
+                  </div>
+                  <ChevronDown 
+                    className={`w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-all duration-200 ${
+                      isMarketplaceItemsExpanded ? 'rotate-180' : ''
+                    }`} 
+                  />
+                </button>
+                
+                {isMarketplaceItemsExpanded && (
+                  <div className="animate-fadeInUp">
+                    {userMarketplaceItems.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No items for sale yet</p>
+                        {isOwnProfile && (
+                          <p className="text-sm">List your first item for sale!</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {userMarketplaceItems.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => onSelectMarketplaceItem(item)}
+                            className="w-full bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left transition-all duration-200 group border border-gray-700 hover:border-gray-600"
+                          >
+                            <div className="flex items-start space-x-3">
+                              {item.images && item.images.length > 0 && (
+                                <img
+                                  src={item.images[0]}
+                                  alt="Item preview"
+                                  className="w-16 h-16 rounded-lg object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-sm font-semibold text-gray-200 line-clamp-1 group-hover:text-gray-100 transition-colors">
+                                    {item.title}
+                                  </h4>
+                                  <span className="text-sm font-bold text-green-400 flex-shrink-0">
+                                    {formatPrice(item.price)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-300 line-clamp-2 mb-3">
+                                  {truncateText(item.description)}
+                                </p>
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs text-gray-400">
+                                    {formatItemDate(item.created_at)}
+                                  </p>
+                                  <div className="flex items-center space-x-2 text-green-400 group-hover:text-green-300 transition-colors">
+                                    <ShoppingBag className="w-4 h-4" />
+                                    <span className="text-xs font-medium">View Item</span>
+                                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform duration-200" />
+                                  </div>
                                 </div>
                               </div>
                             </div>

@@ -9,7 +9,7 @@ import BlogModal from './components/UI/BlogModal';
 import ChatWindow from './components/UI/ChatWindow';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
-import { Pin, supabase, getCurrentUserProfile } from './lib/supabase';
+import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem } from './lib/supabase';
 import { getGuestUsername, setGuestUsername } from './lib/storage';
 import { LocationData } from './lib/geocoding';
 
@@ -33,6 +33,8 @@ function App() {
   const [isConnected, setIsConnected] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
+  const [selectedMarketplaceItem, setSelectedMarketplaceItem] = useState<MarketplaceItem | null>(null);
 
   useEffect(() => {
     // Check authentication status
@@ -163,15 +165,33 @@ function App() {
     setIsUserProfileModalOpen(false);
   };
 
+  const handleSelectBlogPostFromProfile = (post: BlogPost) => {
+    setSelectedBlogPost(post);
+    setIsUserProfileModalOpen(false);
+    setIsBlogModalOpen(true);
+  };
+
+  const handleSelectMarketplaceItemFromProfile = (item: MarketplaceItem) => {
+    setSelectedMarketplaceItem(item);
+    setIsUserProfileModalOpen(false);
+    setIsMarketplaceModalOpen(true);
+  };
+
   const handleOpenExploreModal = () => {
     setIsExploreModalOpen(true);
   };
 
-  const handleOpenMarketplaceModal = () => {
+  const handleOpenMarketplaceModal = (item?: MarketplaceItem) => {
+    if (item) {
+      setSelectedMarketplaceItem(item);
+    }
     setIsMarketplaceModalOpen(true);
   };
 
-  const handleOpenBlogModal = () => {
+  const handleOpenBlogModal = (post?: BlogPost) => {
+    if (post) {
+      setSelectedBlogPost(post);
+    }
     setIsBlogModalOpen(true);
   };
 
@@ -514,6 +534,16 @@ function App() {
     setPinToEdit(null);
   };
 
+  const handleCloseBlogModal = () => {
+    setIsBlogModalOpen(false);
+    setSelectedBlogPost(null);
+  };
+
+  const handleCloseMarketplaceModal = () => {
+    setIsMarketplaceModalOpen(false);
+    setSelectedMarketplaceItem(null);
+  };
+
   // Show auth page if requested
   if (isAuthPageOpen) {
     return <AuthPage onCloseAuth={handleCloseAuth} />;
@@ -545,8 +575,8 @@ function App() {
       <FloatingControls
         onOpenUserProfile={() => handleOpenUserProfile(currentUser)}
         onOpenExploreModal={handleOpenExploreModal}
-        onOpenMarketplaceModal={handleOpenMarketplaceModal}
-        onOpenBlogModal={handleOpenBlogModal}
+        onOpenMarketplaceModal={() => handleOpenMarketplaceModal()}
+        onOpenBlogModal={() => handleOpenBlogModal()}
         onOpenChatWindow={() => handleOpenChatWindow()}
         onAuthButtonClick={handleAuthButtonClick}
         totalPins={pins.length}
@@ -569,6 +599,8 @@ function App() {
         username={profileToViewUsername}
         currentUser={currentUser}
         onSelectPin={handleSelectPinFromProfile}
+        onSelectBlogPost={handleSelectBlogPostFromProfile}
+        onSelectMarketplaceItem={handleSelectMarketplaceItemFromProfile}
         onUsernameChange={handleUsernameChange}
         isCurrentUserAdmin={isAdminUser}
         onOpenChatWindow={handleOpenChatWindow}
@@ -588,19 +620,21 @@ function App() {
 
       <MarketplaceModal
         isOpen={isMarketplaceModalOpen}
-        onClose={() => setIsMarketplaceModalOpen(false)}
+        onClose={handleCloseMarketplaceModal}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
         onOpenChatWindow={handleOpenChatWindow}
         onOpenUserProfile={handleOpenUserProfile}
+        initialItem={selectedMarketplaceItem}
       />
 
       <BlogModal
         isOpen={isBlogModalOpen}
-        onClose={() => setIsBlogModalOpen(false)}
+        onClose={handleCloseBlogModal}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
         onOpenUserProfile={handleOpenUserProfile}
+        initialPost={selectedBlogPost}
       />
 
       <ChatWindow

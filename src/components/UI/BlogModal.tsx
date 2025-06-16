@@ -9,6 +9,7 @@ interface BlogModalProps {
   currentUser: string;
   isAuthenticated: boolean;
   onOpenUserProfile: (username: string) => void;
+  initialPost?: BlogPost | null;
 }
 
 const BlogModal: React.FC<BlogModalProps> = ({
@@ -17,6 +18,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   currentUser,
   isAuthenticated,
   onOpenUserProfile,
+  initialPost = null,
 }) => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,8 +42,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
     if (isOpen) {
       fetchPosts();
       checkAdminStatus();
+
+      // If initialPost is provided, set it as selected
+      if (initialPost) {
+        setSelectedPost(initialPost);
+      }
     }
-  }, [isOpen, filterBy, currentUser, isAuthenticated]);
+  }, [isOpen, filterBy, currentUser, isAuthenticated, initialPost]);
 
   useEffect(() => {
     if (posts.length > 0) {
@@ -222,31 +229,33 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
   };
 
-  const filteredPosts = posts.filter(post =>
-    post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.author_username.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => {
-    // First, always sort by editor's choice status
-    if (a.is_editor_choice && !b.is_editor_choice) return -1;
-    if (!a.is_editor_choice && b.is_editor_choice) return 1;
-    
-    // Then sort by the selected criteria
-    if (sortBy === 'newest') {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    } else if (sortBy === 'oldest') {
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    } else if (sortBy === 'most-liked') {
-      const aLikes = blogPostLikeCounts[a.id] || 0;
-      const bLikes = blogPostLikeCounts[b.id] || 0;
-      // Sort by likes descending, then by newest if likes are equal
-      if (bLikes === aLikes) {
+  const filteredAndSortedPosts = posts
+    .filter(post =>
+      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      post.author_username.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // First, always sort by editor's choice status
+      if (a.is_editor_choice && !b.is_editor_choice) return -1;
+      if (!a.is_editor_choice && b.is_editor_choice) return 1;
+      
+      // Then sort by the selected criteria
+      if (sortBy === 'newest') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (sortBy === 'oldest') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortBy === 'most-liked') {
+        const aLikes = blogPostLikeCounts[a.id] || 0;
+        const bLikes = blogPostLikeCounts[b.id] || 0;
+        // Sort by likes descending, then by newest if likes are equal
+        if (bLikes === aLikes) {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        return bLikes - aLikes;
       }
-      return bLikes - aLikes;
-    }
-    return 0;
-  });
+      return 0;
+    });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -520,7 +529,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
               <div className="flex items-center justify-center py-12">
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
-            ) : filteredPosts.length === 0 ? (
+            ) : filteredAndSortedPosts.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
                 <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">
@@ -539,7 +548,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredPosts.map((post) => {
+                {filteredAndSortedPosts.map((post) => {
                   const authorProfilePicture = profilePictureCache[post.author_username];
                   const postLikeCount = blogPostLikeCounts[post.id] || 0;
                   const userHasLiked = userBlogPostLikes[post.id] || false;
@@ -634,6 +643,34 @@ const BlogModal: React.FC<BlogModalProps> = ({
                                 </button>
                               </div>
                             )}
+                            {(canEditPost(post) || canDeletePost(post)) && (
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {canEditPost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditPost(post);
+                                    }}
+                                    className="p-1 hover:bg-blue-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                                  >
+                                    <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
+                                  </button>
+                                )}
+                                {canDeletePost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePost(post.id);
+                                    }}
+                                    className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -686,34 +723,6 @@ const BlogModal: React.FC<BlogModalProps> = ({
                                 />
                               )}
                             </button>
-                            {(canEditPost(post) || canDeletePost(post)) && (
-                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {canEditPost(post) && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditPost(post);
-                                    }}
-                                    className="p-1 hover:bg-blue-600 rounded-full transition-colors"
-                                    title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
-                                  >
-                                    <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
-                                  </button>
-                                )}
-                                {canDeletePost(post) && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeletePost(post.id);
-                                    }}
-                                    className="p-1 hover:bg-red-600 rounded-full transition-colors"
-                                    title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
-                                  >
-                                    <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
-                                  </button>
-                                )}
-                              </div>
-                            )}
                             <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
                               Read more →
                             </span>
@@ -730,7 +739,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
           {/* Footer */}
           <div className="border-t border-gray-700 p-4 bg-gray-900">
             <div className="text-center text-sm text-gray-400">
-              Showing {filteredPosts.length} of {posts.length} posts
+              Showing {filteredAndSortedPosts.length} of {posts.length} posts
               {filterBy === 'my-posts' && (
                 <span className="ml-2 text-blue-400">• Your posts</span>
               )}
