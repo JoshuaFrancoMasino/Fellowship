@@ -72,6 +72,12 @@ export type Profile = {
   updated_at: string;
 };
 
+export type PublicProfile = {
+  id: string;
+  username: string;
+  profile_picture_url?: string;
+};
+
 export type MarketplaceItem = {
   id: string;
   seller_username: string;
@@ -137,17 +143,18 @@ export const getCurrentUserProfile = async (): Promise<Profile | null> => {
   }
 };
 
-export const getProfileByUsername = async (username: string): Promise<Profile | null> => {
+export const getProfileByUsername = async (username: string): Promise<PublicProfile | null> => {
   if (!supabase) return null;
   
   try {
+    // Use the public_profiles view for public access to profile data
     const { data, error } = await supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('*')
       .eq('username', username);
 
     if (error) {
-      console.error('❌ Error fetching profile by username:', error);
+      console.error('❌ Error fetching public profile by username:', error);
       return null;
     }
 
