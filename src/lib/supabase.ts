@@ -60,6 +60,13 @@ export type ChatMessage = {
   created_at: string;
 };
 
+export type ChatMessageLike = {
+  id: string;
+  message_id: string;
+  username: string;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   username: string;
@@ -663,6 +670,122 @@ export const getUserBlogPostLikes = async (blogPostIds: string[], username: stri
     return userLikes;
   } catch (err) {
     console.error('Failed to fetch user blog post likes:', err);
+    return {};
+  }
+};
+
+// Chat message like functions
+export const toggleChatMessageLike = async (messageId: string, username: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    console.log('💖 Toggling chat message like:', { messageId, username });
+    
+    // Check if like already exists
+    const { data: existingLike, error: selectError } = await supabase
+      .from('chat_message_likes')
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('username', username)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('Error checking existing chat message like:', selectError);
+      return false;
+    }
+
+    if (existingLike) {
+      // Remove like
+      console.log('👎 Removing existing like');
+      const { error: deleteError } = await supabase
+        .from('chat_message_likes')
+        .delete()
+        .eq('id', existingLike.id);
+
+      if (deleteError) {
+        console.error('Error deleting chat message like:', deleteError);
+        return false;
+      }
+      
+      console.log('✅ Like removed successfully');
+      return true;
+    } else {
+      // Add like
+      console.log('👍 Adding new like');
+      const { error: insertError } = await supabase
+        .from('chat_message_likes')
+        .insert([
+          {
+            message_id: messageId,
+            username: username,
+          }
+        ]);
+
+      if (insertError) {
+        console.error('Error inserting chat message like:', insertError);
+        return false;
+      }
+      
+      console.log('✅ Like added successfully');
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to toggle chat message like:', err);
+    return false;
+  }
+};
+
+export const getChatMessageLikeCounts = async (messageIds: string[]): Promise<{ [key: string]: number }> => {
+  if (!supabase || messageIds.length === 0) return {};
+  
+  try {
+    const { data, error } = await supabase
+      .from('chat_message_likes')
+      .select('message_id')
+      .in('message_id', messageIds);
+
+    if (error) {
+      console.error('Error fetching chat message like counts:', error);
+      return {};
+    }
+
+    // Count likes per message
+    const likeCounts: { [key: string]: number } = {};
+    data?.forEach(like => {
+      likeCounts[like.message_id] = (likeCounts[like.message_id] || 0) + 1;
+    });
+
+    return likeCounts;
+  } catch (err) {
+    console.error('Failed to fetch chat message like counts:', err);
+    return {};
+  }
+};
+
+export const getUserChatMessageLikes = async (messageIds: string[], username: string): Promise<{ [key: string]: boolean }> => {
+  if (!supabase || messageIds.length === 0) return {};
+  
+  try {
+    const { data, error } = await supabase
+      .from('chat_message_likes')
+      .select('message_id')
+      .in('message_id', messageIds)
+      .eq('username', username);
+
+    if (error) {
+      console.error('Error fetching user chat message likes:', error);
+      return {};
+    }
+
+    // Create lookup for user's likes
+    const userLikes: { [key: string]: boolean } = {};
+    data?.forEach(like => {
+      userLikes[like.message_id] = true;
+    });
+
+    return userLikes;
+  } catch (err) {
+    console.error('Failed to fetch user chat message likes:', err);
     return {};
   }
 };
