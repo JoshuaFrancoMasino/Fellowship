@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
-import { getProfileByUsername } from '../../lib/supabase';
+import { getProfileByUsername, getCurrentUserProfile } from '../../lib/supabase';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -67,7 +67,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (conversations.length > 0 || (viewingConversation && recipientUsername)) {
       fetchProfilePictures();
     }
-  }, [conversations, viewingConversation, recipientUsername]);
+  }, [conversations, viewingConversation, recipientUsername, messages, currentUser]);
 
   const fetchProfilePictures = async () => {
     const usernames = new Set<string>();
@@ -83,13 +83,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       usernames.add(recipientUsername);
     }
 
+    // Always add current user to ensure their profile picture is cached
+    usernames.add(currentUser);
+
     const cache: { [key: string]: string | null } = { ...profilePictureCache };
 
     // Fetch profile pictures for non-guest users who aren't already cached
     for (const username of usernames) {
       if (!isGuestUser(username) && !(username in cache)) {
         try {
-          const profile = await getProfileByUsername(username);
+          // Use getCurrentUserProfile for current user, getProfileByUsername for others
+          const profile = username === currentUser && isAuthenticated
+            ? await getCurrentUserProfile()
+            : await getProfileByUsername(username);
           cache[username] = profile?.profile_picture_url || null;
         } catch (error) {
           console.error(`Error fetching profile picture for ${username}:`, error);
@@ -488,9 +494,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                           {/* Profile picture for current user's messages */}
                           {message.username === currentUser && (
                             <div className="flex-shrink-0">
-                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                                <User className="w-4 h-4 text-white" />
-                              </div>
+                              {isGuestUser(currentUser) ? (
+                                <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                                  <User className="w-4 h-4 text-white" />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center overflow-hidden">
+                                  {profilePictureCache[currentUser] ? (
+                                    <img
+                                      src={profilePictureCache[currentUser]!}
+                                      alt="Your profile"
+                                      className="w-full h-full object-cover rounded-full"
+                                    />
+                                  ) : (
+                                    <User className="w-4 h-4 text-white" />
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
