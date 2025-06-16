@@ -76,6 +76,9 @@ export type PublicProfile = {
   id: string;
   username: string;
   profile_picture_url?: string;
+  about_me?: string;
+  contact_info?: string;
+  created_at: string;
 };
 
 export type MarketplaceItem = {
@@ -103,6 +106,13 @@ export type BlogPost = {
   updated_at: string;
   is_published: boolean;
   view_count: number;
+};
+
+export type BlogPostLike = {
+  id: string;
+  blog_post_id: string;
+  username: string;
+  created_at: string;
 };
 
 export const getCurrentUserProfile = async (): Promise<Profile | null> => {
@@ -554,6 +564,106 @@ export const getBlogPost = async (postId: string): Promise<BlogPost | null> => {
   } catch (err) {
     console.error('Failed to fetch blog post:', err);
     return null;
+  }
+};
+
+// Blog post like functions
+export const toggleBlogPostLike = async (blogPostId: string, username: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    // Check if like already exists
+    const { data: existingLike, error: selectError } = await supabase
+      .from('blog_post_likes')
+      .select('id')
+      .eq('blog_post_id', blogPostId)
+      .eq('username', username)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('Error checking existing blog post like:', selectError);
+      return false;
+    }
+
+    if (existingLike) {
+      // Remove like
+      const { error: deleteError } = await supabase
+        .from('blog_post_likes')
+        .delete()
+        .eq('id', existingLike.id);
+
+      return !deleteError;
+    } else {
+      // Add like
+      const { error: insertError } = await supabase
+        .from('blog_post_likes')
+        .insert([
+          {
+            blog_post_id: blogPostId,
+            username: username,
+          }
+        ]);
+
+      return !insertError;
+    }
+  } catch (err) {
+    console.error('Failed to toggle blog post like:', err);
+    return false;
+  }
+};
+
+export const getBlogPostLikeCounts = async (blogPostIds: string[]): Promise<{ [key: string]: number }> => {
+  if (!supabase || blogPostIds.length === 0) return {};
+  
+  try {
+    const { data, error } = await supabase
+      .from('blog_post_likes')
+      .select('blog_post_id')
+      .in('blog_post_id', blogPostIds);
+
+    if (error) {
+      console.error('Error fetching blog post like counts:', error);
+      return {};
+    }
+
+    // Count likes per blog post
+    const likeCounts: { [key: string]: number } = {};
+    data?.forEach(like => {
+      likeCounts[like.blog_post_id] = (likeCounts[like.blog_post_id] || 0) + 1;
+    });
+
+    return likeCounts;
+  } catch (err) {
+    console.error('Failed to fetch blog post like counts:', err);
+    return {};
+  }
+};
+
+export const getUserBlogPostLikes = async (blogPostIds: string[], username: string): Promise<{ [key: string]: boolean }> => {
+  if (!supabase || blogPostIds.length === 0) return {};
+  
+  try {
+    const { data, error } = await supabase
+      .from('blog_post_likes')
+      .select('blog_post_id')
+      .in('blog_post_id', blogPostIds)
+      .eq('username', username);
+
+    if (error) {
+      console.error('Error fetching user blog post likes:', error);
+      return {};
+    }
+
+    // Create lookup for user's likes
+    const userLikes: { [key: string]: boolean } = {};
+    data?.forEach(like => {
+      userLikes[like.blog_post_id] = true;
+    });
+
+    return userLikes;
+  } catch (err) {
+    console.error('Failed to fetch user blog post likes:', err);
+    return {};
   }
 };
 

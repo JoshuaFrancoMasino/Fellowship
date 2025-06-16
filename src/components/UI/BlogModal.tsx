@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost } from '../../lib/supabase';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart } from 'lucide-react';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
 interface BlogModalProps {
@@ -22,12 +22,16 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBy, setFilterBy] = useState<'all' | 'my-posts'>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'most-liked'>('newest');
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
   const [togglingEditorChoice, setTogglingEditorChoice] = useState<string | null>(null);
+  const [blogPostLikeCounts, setBlogPostLikeCounts] = useState<{ [key: string]: number }>({});
+  const [userBlogPostLikes, setUserBlogPostLikes] = useState<{ [key: string]: boolean }>({});
+  const [togglingLike, setTogglingLike] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -42,8 +46,12 @@ const BlogModal: React.FC<BlogModalProps> = ({
   useEffect(() => {
     if (posts.length > 0) {
       fetchProfilePictures();
+      fetchBlogPostLikeCounts();
+      if (currentUser) {
+        fetchUserBlogPostLikes();
+      }
     }
-  }, [posts]);
+  }, [posts, currentUser]);
 
   const fetchProfilePictures = async () => {
     const usernames = [...new Set(posts.map(post => post.author_username))];
@@ -65,6 +73,18 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
 
     setProfilePictureCache(cache);
+  };
+
+  const fetchBlogPostLikeCounts = async () => {
+    const postIds = posts.map(post => post.id);
+    const likeCounts = await getBlogPostLikeCounts(postIds);
+    setBlogPostLikeCounts(likeCounts);
+  };
+
+  const fetchUserBlogPostLikes = async () => {
+    const postIds = posts.map(post => post.id);
+    const userLikes = await getUserBlogPostLikes(postIds, currentUser);
+    setUserBlogPostLikes(userLikes);
   };
 
   const checkAdminStatus = async () => {
@@ -131,6 +151,54 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
   };
 
+  const handleToggleLike = async (postId: string) => {
+    if (!currentUser) {
+      alert('Please sign in or set a username to like posts');
+      return;
+    }
+
+    setTogglingLike(postId);
+
+    try {
+      const success = await toggleBlogPostLike(postId, currentUser);
+
+      if (success) {
+        // Optimistically update the UI
+        const currentLikeCount = blogPostLikeCounts[postId] || 0;
+        const userHasLiked = userBlogPostLikes[postId] || false;
+
+        if (userHasLiked) {
+          // User is removing their like
+          setBlogPostLikeCounts(prev => ({
+            ...prev,
+            [postId]: Math.max(0, currentLikeCount - 1)
+          }));
+          setUserBlogPostLikes(prev => ({
+            ...prev,
+            [postId]: false
+          }));
+        } else {
+          // User is adding a like
+          setBlogPostLikeCounts(prev => ({
+            ...prev,
+            [postId]: currentLikeCount + 1
+          }));
+          setUserBlogPostLikes(prev => ({
+            ...prev,
+            [postId]: true
+          }));
+        }
+      } else {
+        alert('Failed to update like status');
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      alert('Failed to update like status');
+    } finally {
+      setTogglingLike(null);
+    }
+  };
+
   const handleEditPost = (post: BlogPost) => {
     setSelectedPost(null); // Close the detailed post view
     setPostToEdit(post);
@@ -163,8 +231,21 @@ const BlogModal: React.FC<BlogModalProps> = ({
     if (a.is_editor_choice && !b.is_editor_choice) return -1;
     if (!a.is_editor_choice && b.is_editor_choice) return 1;
     
-    // Then sort by creation date (newest first)
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    // Then sort by the selected criteria
+    if (sortBy === 'newest') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else if (sortBy === 'oldest') {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    } else if (sortBy === 'most-liked') {
+      const aLikes = blogPostLikeCounts[a.id] || 0;
+      const bLikes = blogPostLikeCounts[b.id] || 0;
+      // Sort by likes descending, then by newest if likes are equal
+      if (bLikes === aLikes) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      return bLikes - aLikes;
+    }
+    return 0;
   });
 
   const formatDate = (dateString: string) => {
@@ -202,6 +283,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
   // Post detail view
   if (selectedPost) {
     const authorProfilePicture = profilePictureCache[selectedPost.author_username];
+    const postLikeCount = blogPostLikeCounts[selectedPost.id] || 0;
+    const userHasLiked = userBlogPostLikes[selectedPost.id] || false;
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -259,12 +342,33 @@ const BlogModal: React.FC<BlogModalProps> = ({
                   </div>
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 icon-shadow-white-sm" />
-              </button>
+              <div className="flex items-center space-x-2">
+                {/* Like Button */}
+                <button
+                  onClick={() => handleToggleLike(selectedPost.id)}
+                  disabled={togglingLike === selectedPost.id}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                    userHasLiked
+                      ? 'bg-red-600/20 border border-red-500/50 text-red-300'
+                      : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
+                  } ${togglingLike === selectedPost.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {togglingLike === selectedPost.id ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Heart
+                      className={`w-4 h-4 ${userHasLiked ? 'fill-current' : ''}`}
+                    />
+                  )}
+                  <span className="text-sm font-medium">{postLikeCount}</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 icon-shadow-white-sm" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -281,6 +385,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
             <div className="mt-8 pt-6 border-t border-gray-700">
               <div className="flex items-center justify-between text-sm text-gray-400">
                 <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <Heart className="w-4 h-4" />
+                    <span>{postLikeCount} likes</span>
+                  </div>
                   <div className="flex items-center space-x-1">
                     <Eye className="w-4 h-4" />
                     <span>{selectedPost.view_count} views</span>
@@ -375,6 +483,20 @@ const BlogModal: React.FC<BlogModalProps> = ({
                 />
               </div>
 
+              {/* Sort */}
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-gray-400" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'most-liked')}
+                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="most-liked">Most Liked</option>
+                </select>
+              </div>
+
               {/* Filter */}
               {isAuthenticated && (
                 <div className="flex items-center space-x-2">
@@ -419,6 +541,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredPosts.map((post) => {
                   const authorProfilePicture = profilePictureCache[post.author_username];
+                  const postLikeCount = blogPostLikeCounts[post.id] || 0;
+                  const userHasLiked = userBlogPostLikes[post.id] || false;
 
                   return (
                     <div
@@ -510,6 +634,58 @@ const BlogModal: React.FC<BlogModalProps> = ({
                                 </button>
                               </div>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-lg font-semibold text-gray-200 mb-3 line-clamp-2 group-hover:text-gray-100 transition-colors">
+                          {post.title}
+                        </h3>
+
+                        {/* Excerpt */}
+                        <p className="text-sm text-gray-300 line-clamp-3 mb-4">
+                          {post.excerpt || truncateContent(post.content)}
+                        </p>
+
+                        {/* Post Stats */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Heart className="w-3 h-3" />
+                              <span>{postLikeCount}</span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Eye className="w-3 h-3" />
+                              <span>{post.view_count}</span>
+                            </div>
+                            {!post.is_published && (
+                              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full">
+                                Draft
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {/* Like Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleLike(post.id);
+                              }}
+                              disabled={togglingLike === post.id}
+                              className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-all duration-200 ${
+                                userHasLiked
+                                  ? 'bg-red-600/20 border border-red-500/50 text-red-300'
+                                  : 'bg-gray-700 border border-gray-600 text-gray-400 hover:bg-gray-600 hover:text-red-300'
+                              } ${togglingLike === post.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {togglingLike === post.id ? (
+                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <Heart
+                                  className={`w-3 h-3 ${userHasLiked ? 'fill-current' : ''}`}
+                                />
+                              )}
+                            </button>
                             {(canEditPost(post) || canDeletePost(post)) && (
                               <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {canEditPost(post) && (
@@ -538,35 +714,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
                                 )}
                               </div>
                             )}
+                            <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
+                              Read more →
+                            </span>
                           </div>
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-lg font-semibold text-gray-200 mb-3 line-clamp-2 group-hover:text-gray-100 transition-colors">
-                          {post.title}
-                        </h3>
-
-                        {/* Excerpt */}
-                        <p className="text-sm text-gray-300 line-clamp-3 mb-4">
-                          {post.excerpt || truncateContent(post.content)}
-                        </p>
-
-                        {/* Post Stats */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-1 text-xs text-gray-500">
-                              <Eye className="w-3 h-3" />
-                              <span>{post.view_count}</span>
-                            </div>
-                            {!post.is_published && (
-                              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full">
-                                Draft
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
-                            Read more →
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -582,6 +733,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
               Showing {filteredPosts.length} of {posts.length} posts
               {filterBy === 'my-posts' && (
                 <span className="ml-2 text-blue-400">• Your posts</span>
+              )}
+              {sortBy === 'most-liked' && (
+                <span className="ml-2 text-red-400">• Sorted by most liked</span>
               )}
               {isAdminUser && (
                 <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
