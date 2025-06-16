@@ -307,6 +307,22 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     return text.substring(0, maxLength) + '...';
   };
 
+  // Helper function to get the display username
+  const getDisplayUsername = () => {
+    // If we have a valid userProfile object with a username, use it directly
+    if (userProfile && userProfile.username) {
+      return userProfile.username;
+    }
+    
+    // For guest users or when no profile is available, show "Guest {username}"
+    if (isGuestUser) {
+      return `Guest ${username}`;
+    }
+    
+    // Fallback to the provided username
+    return username;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -350,7 +366,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 }}
               >
                 {/* Profile Picture or Default Icon */}
-                {userProfile?.profile_picture_url && !isGuestUser ? (
+                {userProfile?.profile_picture_url ? (
                   <img
                     src={userProfile.profile_picture_url}
                     alt="Profile"
@@ -388,7 +404,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
                     <h1 className="text-3xl font-bold text-gray-200">
-                      {isAuthenticated && userProfile && !isGuestUser ? userProfile.username : `Guest ${username}`}
+                      {getDisplayUsername()}
                     </h1>
                     {userProfile?.role === 'admin' && (
                       <span className="px-2 py-1 bg-red-600 text-white text-xs rounded-full">
@@ -592,7 +608,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 ) : (
                   <div className="bg-gray-800 rounded-lg p-4">
                     <p className="text-gray-200 font-mono text-lg">
-                      {userProfile?.username || `Guest ${username}`}
+                      {userProfile?.username || username}
                     </p>
                     <p className="text-sm text-gray-400 mt-1">
                       Your current username
