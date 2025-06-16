@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MessageCircle, User, Calendar, DollarSign, ChevronLeft, ChevronRight, AlertCircle, Edit, Trash2 } from 'lucide-react';
-import { MarketplaceItem } from '../../lib/supabase';
+import { MarketplaceItem, getProfileByUsername } from '../../lib/supabase';
 import { chatService } from '../../lib/chatService';
 
 interface MarketplaceItemDetailModalProps {
@@ -30,6 +30,31 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   const [contactMessage, setContactMessage] = useState('');
   const [isContacting, setIsContacting] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
+  const [sellerProfilePicture, setSellerProfilePicture] = useState<string | null>(null);
+
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
+
+  useEffect(() => {
+    if (item) {
+      fetchSellerProfilePicture();
+    }
+  }, [item]);
+
+  const fetchSellerProfilePicture = async () => {
+    if (!item || isGuestUser(item.seller_username)) {
+      setSellerProfilePicture(null);
+      return;
+    }
+
+    try {
+      const profile = await getProfileByUsername(item.seller_username);
+      setSellerProfilePicture(profile?.profile_picture_url || null);
+    } catch (error) {
+      console.error('Error fetching seller profile picture:', error);
+      setSellerProfilePicture(null);
+    }
+  };
 
   if (!isOpen || !item) return null;
 
@@ -247,9 +272,23 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
             {/* Seller Info */}
             <div className="mb-6 p-4 bg-gray-800 rounded-lg">
               <div className="flex items-center space-x-3 mb-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+                {isGuestUser(item.seller_username) ? (
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                    {sellerProfilePicture ? (
+                      <img
+                        src={sellerProfilePicture}
+                        alt={`${item.seller_username}'s profile`}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    ) : (
+                      <User className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                )}
                 <div>
                   <p className="font-medium text-gray-200">
                     {item.seller_username.match(/^\d{7}$/) ? `Guest ${item.seller_username}` : item.seller_username}

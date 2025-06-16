@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, User, Heart, MessageCircle, Search, Filter, Globe, ChevronDown } from 'lucide-react';
-import { Pin, supabase } from '../../lib/supabase';
+import { Pin, supabase, getProfileByUsername } from '../../lib/supabase';
 import { getUniqueLocations } from '../../lib/geocoding';
 
 interface LocationFilters {
@@ -44,6 +44,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     states: [] as string[],
     localities: [] as string[],
   });
+  const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -52,8 +53,31 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     if (isOpen) {
       fetchEngagementData();
       setUniqueLocations(getUniqueLocations(pins));
+      fetchProfilePictures();
     }
   }, [isOpen, pins]);
+
+  const fetchProfilePictures = async () => {
+    const usernames = [...new Set(pins.map(pin => pin.username))];
+    const cache: { [key: string]: string | null } = {};
+
+    // Fetch profile pictures for non-guest users
+    for (const username of usernames) {
+      if (!isGuestUser(username)) {
+        try {
+          const profile = await getProfileByUsername(username);
+          cache[username] = profile?.profile_picture_url || null;
+        } catch (error) {
+          console.error(`Error fetching profile picture for ${username}:`, error);
+          cache[username] = null;
+        }
+      } else {
+        cache[username] = null; // Guest users don't have profile pictures
+      }
+    }
+
+    setProfilePictureCache(cache);
+  };
 
   const fetchEngagementData = async () => {
     if (pins.length === 0) return;
@@ -424,6 +448,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
               {filteredAndSortedPins.map((pin) => {
                 const likeCount = likeCounts[pin.id] || 0;
                 const commentCount = commentCounts[pin.id] || 0;
+                const profilePicture = profilePictureCache[pin.username];
 
                 return (
                   <div
@@ -466,12 +491,20 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                             <User className="w-4 h-4 text-white" />
                           </div>
                         ) : (
-                          // Clickable version for authenticated users
+                          // Clickable version for authenticated users with profile picture
                           <button
                             onClick={() => handleUserProfileClick(pin.username)}
-                            className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform"
+                            className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
                           >
-                            <User className="w-4 h-4 text-white" />
+                            {profilePicture ? (
+                              <img
+                                src={profilePicture}
+                                alt={`${pin.username}'s profile`}
+                                className="w-full h-full object-cover rounded-full"
+                              />
+                            ) : (
+                              <User className="w-4 h-4 text-white" />
+                            )}
                           </button>
                         )}
                         <div className="flex-1">
@@ -486,7 +519,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                               onClick={() => handleUserProfileClick(pin.username)}
                               className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
                             >
-                              Guest {pin.username}
+                              {pin.username}
                             </button>
                           )}
                           <p className="text-xs text-gray-400">{formatDate(pin.created_at)}</p>

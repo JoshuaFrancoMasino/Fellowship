@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile } from '../../lib/supabase';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
 interface BlogModalProps {
@@ -26,6 +26,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -36,6 +37,34 @@ const BlogModal: React.FC<BlogModalProps> = ({
       checkAdminStatus();
     }
   }, [isOpen, filterBy, currentUser, isAuthenticated]);
+
+  useEffect(() => {
+    if (posts.length > 0) {
+      fetchProfilePictures();
+    }
+  }, [posts]);
+
+  const fetchProfilePictures = async () => {
+    const usernames = [...new Set(posts.map(post => post.author_username))];
+    const cache: { [key: string]: string | null } = {};
+
+    // Fetch profile pictures for non-guest users
+    for (const username of usernames) {
+      if (!isGuestUser(username)) {
+        try {
+          const profile = await getProfileByUsername(username);
+          cache[username] = profile?.profile_picture_url || null;
+        } catch (error) {
+          console.error(`Error fetching profile picture for ${username}:`, error);
+          cache[username] = null;
+        }
+      } else {
+        cache[username] = null; // Guest users don't have profile pictures
+      }
+    }
+
+    setProfilePictureCache(cache);
+  };
 
   const checkAdminStatus = async () => {
     if (!isAuthenticated) {
@@ -134,6 +163,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
 
   // Post detail view
   if (selectedPost) {
+    const authorProfilePicture = profilePictureCache[selectedPost.author_username];
+
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
@@ -147,24 +178,46 @@ const BlogModal: React.FC<BlogModalProps> = ({
                 >
                   <X className="w-5 h-5 icon-shadow-white-sm" />
                 </button>
-                <div>
-                  <h2 className="text-xl font-bold text-shadow-white-md line-clamp-1">
-                    {selectedPost.title}
-                  </h2>
-                  <div className="flex items-center space-x-2 text-blue-100 text-sm text-shadow-white-sm">
-                    <span>by</span>
-                    {isGuestUser(selectedPost.author_username) ? (
-                      <span>Guest {selectedPost.author_username}</span>
-                    ) : (
-                      <button
-                        onClick={() => handleUserProfileClick(selectedPost.author_username)}
-                        className="hover:underline transition-all"
-                      >
-                        {selectedPost.author_username}
-                      </button>
-                    )}
-                    <span>•</span>
-                    <span>{formatDate(selectedPost.created_at)}</span>
+                <div className="flex items-center space-x-3">
+                  {isGuestUser(selectedPost.author_username) ? (
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleUserProfileClick(selectedPost.author_username)}
+                      className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
+                    >
+                      {authorProfilePicture ? (
+                        <img
+                          src={authorProfilePicture}
+                          alt={`${selectedPost.author_username}'s profile`}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <User className="w-4 h-4 text-white" />
+                      )}
+                    </button>
+                  )}
+                  <div>
+                    <h2 className="text-xl font-bold text-shadow-white-md line-clamp-1">
+                      {selectedPost.title}
+                    </h2>
+                    <div className="flex items-center space-x-2 text-blue-100 text-sm text-shadow-white-sm">
+                      <span>by</span>
+                      {isGuestUser(selectedPost.author_username) ? (
+                        <span>Guest {selectedPost.author_username}</span>
+                      ) : (
+                        <button
+                          onClick={() => handleUserProfileClick(selectedPost.author_username)}
+                          className="hover:underline transition-all"
+                        >
+                          {selectedPost.author_username}
+                        </button>
+                      )}
+                      <span>•</span>
+                      <span>{formatDate(selectedPost.created_at)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -326,99 +379,123 @@ const BlogModal: React.FC<BlogModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
-                    onClick={() => setSelectedPost(post)}
-                  >
-                    <div className="p-6">
-                      {/* Post Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="w-3 h-3 text-white" />
+                {filteredPosts.map((post) => {
+                  const authorProfilePicture = profilePictureCache[post.author_username];
+
+                  return (
+                    <div
+                      key={post.id}
+                      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      <div className="p-6">
+                        {/* Post Header */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            {isGuestUser(post.author_username) ? (
+                              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-white" />
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(post.author_username);
+                                }}
+                                className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
+                              >
+                                {authorProfilePicture ? (
+                                  <img
+                                    src={authorProfilePicture}
+                                    alt={`${post.author_username}'s profile`}
+                                    className="w-full h-full object-cover rounded-full"
+                                  />
+                                ) : (
+                                  <User className="w-3 h-3 text-white" />
+                                )}
+                              </button>
+                            )}
+                            {isGuestUser(post.author_username) ? (
+                              <span className="text-sm text-gray-400">Guest {post.author_username}</span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(post.author_username);
+                                }}
+                                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+                              >
+                                {post.author_username}
+                              </button>
+                            )}
                           </div>
-                          {isGuestUser(post.author_username) ? (
-                            <span className="text-sm text-gray-400">Guest {post.author_username}</span>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUserProfileClick(post.author_username);
-                              }}
-                              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
-                            >
-                              {post.author_username}
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDate(post.created_at)}</span>
-                          </div>
-                          {(canEditPost(post) || canDeletePost(post)) && (
-                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {canEditPost(post) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditPost(post);
-                                  }}
-                                  className="p-1 hover:bg-blue-600 rounded-full transition-colors"
-                                  title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
-                                >
-                                  <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
-                                </button>
-                              )}
-                              {canDeletePost(post) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePost(post.id);
-                                  }}
-                                  className="p-1 hover:bg-red-600 rounded-full transition-colors"
-                                  title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
-                                >
-                                  <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
-                                </button>
-                              )}
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(post.created_at)}</span>
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Title */}
-                      <h3 className="text-lg font-semibold text-gray-200 mb-3 line-clamp-2 group-hover:text-gray-100 transition-colors">
-                        {post.title}
-                      </h3>
-
-                      {/* Excerpt */}
-                      <p className="text-sm text-gray-300 line-clamp-3 mb-4">
-                        {post.excerpt || truncateContent(post.content)}
-                      </p>
-
-                      {/* Post Stats */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <Eye className="w-3 h-3" />
-                            <span>{post.view_count}</span>
+                            {(canEditPost(post) || canDeletePost(post)) && (
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {canEditPost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditPost(post);
+                                    }}
+                                    className="p-1 hover:bg-blue-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                                  >
+                                    <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
+                                  </button>
+                                )}
+                                {canDeletePost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePost(post.id);
+                                    }}
+                                    className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          {!post.is_published && (
-                            <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full">
-                              Draft
-                            </span>
-                          )}
                         </div>
-                        <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
-                          Read more →
-                        </span>
+
+                        {/* Title */}
+                        <h3 className="text-lg font-semibold text-gray-200 mb-3 line-clamp-2 group-hover:text-gray-100 transition-colors">
+                          {post.title}
+                        </h3>
+
+                        {/* Excerpt */}
+                        <p className="text-sm text-gray-300 line-clamp-3 mb-4">
+                          {post.excerpt || truncateContent(post.content)}
+                        </p>
+
+                        {/* Post Stats */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Eye className="w-3 h-3" />
+                              <span>{post.view_count}</span>
+                            </div>
+                            {!post.is_published && (
+                              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full">
+                                Draft
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
+                            Read more →
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

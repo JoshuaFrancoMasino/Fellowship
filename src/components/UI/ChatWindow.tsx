@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
+import { getProfileByUsername } from '../../lib/supabase';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -27,7 +28,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [messageError, setMessageError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check if username is a guest user (7-digit number)
+  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
@@ -57,6 +62,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (conversations.length > 0 || (viewingConversation && recipientUsername)) {
+      fetchProfilePictures();
+    }
+  }, [conversations, viewingConversation, recipientUsername]);
+
+  const fetchProfilePictures = async () => {
+    const usernames = new Set<string>();
+
+    // Add usernames from conversations
+    conversations.forEach(conv => usernames.add(conv.username));
+
+    // Add usernames from current conversation messages
+    messages.forEach(msg => usernames.add(msg.username));
+
+    // Add current recipient if viewing a conversation
+    if (viewingConversation && recipientUsername) {
+      usernames.add(recipientUsername);
+    }
+
+    const cache: { [key: string]: string | null } = { ...profilePictureCache };
+
+    // Fetch profile pictures for non-guest users who aren't already cached
+    for (const username of usernames) {
+      if (!isGuestUser(username) && !(username in cache)) {
+        try {
+          const profile = await getProfileByUsername(username);
+          cache[username] = profile?.profile_picture_url || null;
+        } catch (error) {
+          console.error(`Error fetching profile picture for ${username}:`, error);
+          cache[username] = null;
+        }
+      } else if (isGuestUser(username) && !(username in cache)) {
+        cache[username] = null; // Guest users don't have profile pictures
+      }
+    }
+
+    setProfilePictureCache(cache);
+  };
 
   const initializeChat = () => {
     chatService.initialize(currentUser, isAuthenticated);
@@ -315,9 +360,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 </button>
               )}
               <MessageSquare className="w-5 h-5 icon-shadow-white-sm" />
-              <h3 className="font-semibold text-shadow-white-sm">
-                {viewingConversation ? `Chat with ${recipientUsername}` : 'Direct Messages'}
-              </h3>
+              <div className="flex items-center space-x-2">
+                {viewingConversation && recipientUsername && (
+                  <>
+                    {isGuestUser(recipientUsername) ? (
+                      <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <User className="w-3 h-3 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                        {profilePictureCache[recipientUsername] ? (
+                          <img
+                            src={profilePictureCache[recipientUsername]!}
+                            alt={`${recipientUsername}'s profile`}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <User className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                <h3 className="font-semibold text-shadow-white-sm">
+                  {viewingConversation ? `Chat with ${recipientUsername}` : 'Direct Messages'}
+                </h3>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               {isConnected ? (
@@ -377,8 +445,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                       {dayMessages.map((message) => (
                         <div
                           key={message.id}
-                          className={`flex ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
+                          className={`flex items-start space-x-3 ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
                         >
+                          {/* Profile picture for other users' messages */}
+                          {message.username !== currentUser && (
+                            <div className="flex-shrink-0">
+                              {isGuestUser(message.username) ? (
+                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                  <User className="w-4 h-4 text-white" />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                                  {profilePictureCache[message.username] ? (
+                                    <img
+                                      src={profilePictureCache[message.username]!}
+                                      alt={`${message.username}'s profile`}
+                                      className="w-full h-full object-cover rounded-full"
+                                    />
+                                  ) : (
+                                    <User className="w-4 h-4 text-white" />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div
                             className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                               message.username === currentUser
@@ -393,6 +484,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                               {formatTime(message.created_at)}
                             </p>
                           </div>
+
+                          {/* Profile picture for current user's messages */}
+                          {message.username === currentUser && (
+                            <div className="flex-shrink-0">
+                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                                <User className="w-4 h-4 text-white" />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -480,43 +580,61 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 </div>
               ) : (
                 <div className="divide-y divide-gray-700">
-                  {conversations.map((conversation) => (
-                    <button
-                      key={conversation.username}
-                      onClick={() => handleSelectConversation(conversation)}
-                      className="w-full p-4 hover:bg-gray-800 transition-colors text-left flex items-center space-x-3"
-                    >
-                      {/* Avatar */}
-                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="w-6 h-6 text-white" />
-                      </div>
-                      
-                      {/* Conversation Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-medium text-gray-200 truncate">
-                            {conversation.username}
-                          </h4>
-                          <div className="flex items-center space-x-1 text-xs text-gray-400">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatRelativeTime(conversation.lastMessageTime)}</span>
+                  {conversations.map((conversation) => {
+                    const profilePicture = profilePictureCache[conversation.username];
+
+                    return (
+                      <button
+                        key={conversation.username}
+                        onClick={() => handleSelectConversation(conversation)}
+                        className="w-full p-4 hover:bg-gray-800 transition-colors text-left flex items-center space-x-3"
+                      >
+                        {/* Avatar */}
+                        {isGuestUser(conversation.username) ? (
+                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="w-6 h-6 text-white" />
                           </div>
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {profilePicture ? (
+                              <img
+                                src={profilePicture}
+                                alt={`${conversation.username}'s profile`}
+                                className="w-full h-full object-cover rounded-full"
+                              />
+                            ) : (
+                              <User className="w-6 h-6 text-white" />
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Conversation Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-medium text-gray-200 truncate">
+                              {conversation.username}
+                            </h4>
+                            <div className="flex items-center space-x-1 text-xs text-gray-400">
+                              <Clock className="w-3 h-3" />
+                              <span>{formatRelativeTime(conversation.lastMessageTime)}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-400 truncate">
+                            {conversation.lastMessage}
+                          </p>
                         </div>
-                        <p className="text-sm text-gray-400 truncate">
-                          {conversation.lastMessage}
-                        </p>
-                      </div>
-                      
-                      {/* Unread indicator (if needed) */}
-                      {conversation.unreadCount > 0 && (
-                        <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                          <span className="text-xs text-white font-bold">
-                            {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                        
+                        {/* Unread indicator (if needed) */}
+                        {conversation.unreadCount > 0 && (
+                          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                            <span className="text-xs text-white font-bold">
+                              {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

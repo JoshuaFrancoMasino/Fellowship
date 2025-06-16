@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2 } from 'lucide-react';
-import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile } from '../../lib/supabase';
+import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile, getProfileByUsername } from '../../lib/supabase';
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
 import { chatService } from '../../lib/chatService';
@@ -32,6 +32,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   const [contactingItem, setContactingItem] = useState<string | null>(null);
   const [contactMessage, setContactMessage] = useState('');
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -42,6 +43,34 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       checkAdminStatus();
     }
   }, [isOpen, isAuthenticated]);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      fetchProfilePictures();
+    }
+  }, [items]);
+
+  const fetchProfilePictures = async () => {
+    const usernames = [...new Set(items.map(item => item.seller_username))];
+    const cache: { [key: string]: string | null } = {};
+
+    // Fetch profile pictures for non-guest users
+    for (const username of usernames) {
+      if (!isGuestUser(username)) {
+        try {
+          const profile = await getProfileByUsername(username);
+          cache[username] = profile?.profile_picture_url || null;
+        } catch (error) {
+          console.error(`Error fetching profile picture for ${username}:`, error);
+          cache[username] = null;
+        }
+      } else {
+        cache[username] = null; // Guest users don't have profile pictures
+      }
+    }
+
+    setProfilePictureCache(cache);
+  };
 
   const checkAdminStatus = async () => {
     if (!isAuthenticated) {
@@ -284,203 +313,227 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAndSortedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
-                    onClick={() => handleItemClick(item)}
-                  >
-                    {/* Item Image */}
-                    {item.images && item.images.length > 0 && (
-                      <div className="relative h-48 overflow-hidden">
-                        <img
-                          src={item.images[0]}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        {item.images.length > 1 && (
-                          <div className="absolute top-2 right-2 bg-gray-800/70 text-gray-200 px-2 py-1 rounded-full text-xs">
-                            +{item.images.length - 1} more
-                          </div>
-                        )}
-                        <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                          {formatPrice(item.price)}
-                        </div>
-                      </div>
-                    )}
+                {filteredAndSortedItems.map((item) => {
+                  const sellerProfilePicture = profilePictureCache[item.seller_username];
 
-                    {/* Item Content */}
-                    <div className="p-4">
-                      {/* Title and Price */}
-                      <div className="mb-3">
-                        <h3 className="text-lg font-semibold text-gray-200 mb-1 line-clamp-1">
-                          {item.title}
-                        </h3>
-                        {(!item.images || item.images.length === 0) && (
-                          <div className="flex items-center space-x-2 text-green-400 mb-2">
-                            <DollarSign className="w-5 h-5" />
-                            <span className="text-xl font-bold">{formatPrice(item.price)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-sm text-gray-300 line-clamp-3 mb-4">
-                        {item.description}
-                      </p>
-
-                      {/* Seller Info */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="w-3 h-3 text-white" />
-                          </div>
-                          {isGuestUser(item.seller_username) ? (
-                            <span className="text-sm text-gray-400 cursor-default">
-                              Guest {item.seller_username}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUserProfileClick(item.seller_username);
-                              }}
-                              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
-                            >
-                              {item.seller_username}
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-1 text-xs text-gray-500">
-                          <Calendar className="w-3 h-3" />
-                          <span>{formatDate(item.created_at)}</span>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      {(canEditItem(item) || canDeleteItem(item)) && item.seller_username === currentUser ? (
-                        // Own listing - show edit/delete buttons
-                        <div className="border-t border-gray-700 pt-4">
-                          <div className="flex space-x-2">
-                            {canEditItem(item) && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditItem(item);
-                                }}
-                                className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-1"
-                                title={isAdminUser && item.seller_username !== currentUser ? "Edit listing (Admin)" : "Edit your listing"}
-                              >
-                                <Edit className="w-4 h-4" />
-                                <span>Edit</span>
-                              </button>
-                            )}
-                            {canDeleteItem(item) && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteItem(item.id);
-                                }}
-                                className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-1"
-                                title={isAdminUser && item.seller_username !== currentUser ? "Delete listing (Admin)" : "Delete your listing"}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Delete</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ) : item.seller_username !== currentUser ? (
-                        // Other's listing - show contact seller button
-                        <div className="border-t border-gray-700 pt-4">
-                          {contactingItem === item.id ? (
-                            <div className="space-y-3">
-                              <textarea
-                                value={contactMessage}
-                                onChange={(e) => setContactMessage(e.target.value)}
-                                placeholder="Hi! I'm interested in this item..."
-                                maxLength={200}
-                                rows={3}
-                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 text-sm resize-none"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleContactSeller(item);
-                                  }}
-                                  disabled={!contactMessage.trim() || !isAuthenticated}
-                                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center space-x-1"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                  <span>Send</span>
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setContactingItem(null);
-                                    setContactMessage('');
-                                  }}
-                                  className="px-3 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition-colors text-sm"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {contactMessage.length}/200 characters
-                              </div>
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
+                      onClick={() => handleItemClick(item)}
+                    >
+                      {/* Item Image */}
+                      {item.images && item.images.length > 0 && (
+                        <div className="relative h-48 overflow-hidden">
+                          <img
+                            src={item.images[0]}
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                          {item.images.length > 1 && (
+                            <div className="absolute top-2 right-2 bg-gray-800/70 text-gray-200 px-2 py-1 rounded-full text-xs">
+                              +{item.images.length - 1} more
                             </div>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!isAuthenticated) {
-                                  alert('Please sign in to contact sellers');
-                                  return;
-                                }
-                                setContactingItem(item.id);
-                              }}
-                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                              <span>Contact Seller</span>
-                            </button>
+                          )}
+                          <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                            {formatPrice(item.price)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Item Content */}
+                      <div className="p-4">
+                        {/* Title and Price */}
+                        <div className="mb-3">
+                          <h3 className="text-lg font-semibold text-gray-200 mb-1 line-clamp-1">
+                            {item.title}
+                          </h3>
+                          {(!item.images || item.images.length === 0) && (
+                            <div className="flex items-center space-x-2 text-green-400 mb-2">
+                              <DollarSign className="w-5 h-5" />
+                              <span className="text-xl font-bold">{formatPrice(item.price)}</span>
+                            </div>
                           )}
                         </div>
-                      ) : (
-                        // Admin actions for items they don't own
-                        isAdminUser && (
+
+                        {/* Description */}
+                        <p className="text-sm text-gray-300 line-clamp-3 mb-4">
+                          {item.description}
+                        </p>
+
+                        {/* Seller Info */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            {isGuestUser(item.seller_username) ? (
+                              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-white" />
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(item.seller_username);
+                                }}
+                                className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
+                              >
+                                {sellerProfilePicture ? (
+                                  <img
+                                    src={sellerProfilePicture}
+                                    alt={`${item.seller_username}'s profile`}
+                                    className="w-full h-full object-cover rounded-full"
+                                  />
+                                ) : (
+                                  <User className="w-3 h-3 text-white" />
+                                )}
+                              </button>
+                            )}
+                            {isGuestUser(item.seller_username) ? (
+                              <span className="text-sm text-gray-400 cursor-default">
+                                Guest {item.seller_username}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(item.seller_username);
+                                }}
+                                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+                              >
+                                {item.seller_username}
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-1 text-xs text-gray-500">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(item.created_at)}</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        {(canEditItem(item) || canDeleteItem(item)) && item.seller_username === currentUser ? (
+                          // Own listing - show edit/delete buttons
                           <div className="border-t border-gray-700 pt-4">
-                            <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-center">
-                              <p className="text-red-300 text-sm font-medium mb-2">Admin Actions</p>
-                              <div className="flex space-x-2">
+                            <div className="flex space-x-2">
+                              {canEditItem(item) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleEditItem(item);
                                   }}
-                                  className="flex-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-1"
+                                  title={isAdminUser && item.seller_username !== currentUser ? "Edit listing (Admin)" : "Edit your listing"}
                                 >
-                                  Edit
+                                  <Edit className="w-4 h-4" />
+                                  <span>Edit</span>
                                 </button>
+                              )}
+                              {canDeleteItem(item) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteItem(item.id);
                                   }}
-                                  className="flex-1 px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-1"
+                                  title={isAdminUser && item.seller_username !== currentUser ? "Delete listing (Admin)" : "Delete your listing"}
                                 >
-                                  Delete
+                                  <Trash2 className="w-4 h-4" />
+                                  <span>Delete</span>
                                 </button>
-                              </div>
+                              )}
                             </div>
                           </div>
-                        )
-                      )}
+                        ) : item.seller_username !== currentUser ? (
+                          // Other's listing - show contact seller button
+                          <div className="border-t border-gray-700 pt-4">
+                            {contactingItem === item.id ? (
+                              <div className="space-y-3">
+                                <textarea
+                                  value={contactMessage}
+                                  onChange={(e) => setContactMessage(e.target.value)}
+                                  placeholder="Hi! I'm interested in this item..."
+                                  maxLength={200}
+                                  rows={3}
+                                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 text-sm resize-none"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleContactSeller(item);
+                                    }}
+                                    disabled={!contactMessage.trim() || !isAuthenticated}
+                                    className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center space-x-1"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                    <span>Send</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setContactingItem(null);
+                                      setContactMessage('');
+                                    }}
+                                    className="px-3 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition-colors text-sm"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {contactMessage.length}/200 characters
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!isAuthenticated) {
+                                    alert('Please sign in to contact sellers');
+                                    return;
+                                  }
+                                  setContactingItem(item.id);
+                                }}
+                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                <span>Contact Seller</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          // Admin actions for items they don't own
+                          isAdminUser && (
+                            <div className="border-t border-gray-700 pt-4">
+                              <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-center">
+                                <p className="text-red-300 text-sm font-medium mb-2">Admin Actions</p>
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditItem(item);
+                                    }}
+                                    className="flex-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteItem(item.id);
+                                    }}
+                                    className="flex-1 px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

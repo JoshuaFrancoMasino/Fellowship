@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Trash2, X, User, Edit } from 'lucide-react';
-import { Pin, Comment, supabase } from '../../lib/supabase';
+import { Pin, Comment, supabase, getProfileByUsername } from '../../lib/supabase';
 
 interface PinPopupProps {
   pin: Pin;
@@ -31,6 +31,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const [userLikes, setUserLikes] = useState<{ [key: number]: boolean }>({});
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [authorProfilePicture, setAuthorProfilePicture] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -39,7 +40,23 @@ const PinPopup: React.FC<PinPopupProps> = ({
     console.log('🔄 PinPopup useEffect triggered for pin:', pin.id);
     fetchComments();
     fetchLikes();
-  }, [pin.id, currentUser]);
+    fetchAuthorProfilePicture();
+  }, [pin.id, currentUser, pin.username]);
+
+  const fetchAuthorProfilePicture = async () => {
+    if (isGuestUser(pin.username)) {
+      setAuthorProfilePicture(null);
+      return;
+    }
+
+    try {
+      const profile = await getProfileByUsername(pin.username);
+      setAuthorProfilePicture(profile?.profile_picture_url || null);
+    } catch (error) {
+      console.error('Error fetching author profile picture:', error);
+      setAuthorProfilePicture(null);
+    }
+  };
 
   const fetchComments = async () => {
     console.log('💬 Fetching comments for pin:', pin.id);
@@ -194,12 +211,20 @@ const PinPopup: React.FC<PinPopupProps> = ({
                 <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
               </div>
             ) : (
-              // Clickable version for authenticated users
+              // Clickable version for authenticated users with profile picture
               <button
                 onClick={() => handleUserProfileClick(pin.username)}
-                className="w-8 h-8 glass-white rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
+                className="w-8 h-8 glass-white rounded-full flex items-center justify-center hover:bg-white/20 transition-colors overflow-hidden"
               >
-                <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
+                {authorProfilePicture ? (
+                  <img
+                    src={authorProfilePicture}
+                    alt={`${pin.username}'s profile`}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <User className="w-4 h-4 text-gray-600 icon-shadow-white-sm" />
+                )}
               </button>
             )}
             <div>
