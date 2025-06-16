@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2, Heart, Smile } from 'lucide-react';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2 } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
-import { getProfileByUsername, getCurrentUserProfile, toggleChatMessageLike, getChatMessageLikeCounts, getUserChatMessageLikes } from '../../lib/supabase';
+import { getProfileByUsername, getCurrentUserProfile } from '../../lib/supabase';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -31,14 +31,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
   const [deletingConversation, setDeletingConversation] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<string | null>(null);
-  const [messageLikeCounts, setMessageLikeCounts] = useState<{ [key: string]: number }>({});
-  const [userMessageLikes, setUserMessageLikes] = useState<{ [key: string]: boolean }>({});
-  const [togglingLike, setTogglingLike] = useState<string | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Common emojis for quick access
-  const commonEmojis = ['😀', '😂', '😍', '🥰', '😊', '😎', '🤗', '🤔', '😮', '😢', '😡', '👍', '👎', '❤️', '🔥', '💯', '🎉', '🙏', '👋', '💪'];
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -78,15 +71,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [conversations, viewingConversation, recipientUsername, messages, currentUser]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      fetchMessageLikeCounts();
-      if (currentUser) {
-        fetchUserMessageLikes();
-      }
-    }
-  }, [messages, currentUser]);
-
   const fetchProfilePictures = async () => {
     const usernames = new Set<string>();
 
@@ -125,18 +109,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
 
     setProfilePictureCache(cache);
-  };
-
-  const fetchMessageLikeCounts = async () => {
-    const messageIds = messages.map(msg => msg.id);
-    const likeCounts = await getChatMessageLikeCounts(messageIds);
-    setMessageLikeCounts(likeCounts);
-  };
-
-  const fetchUserMessageLikes = async () => {
-    const messageIds = messages.map(msg => msg.id);
-    const userLikes = await getUserChatMessageLikes(messageIds, currentUser);
-    setUserMessageLikes(userLikes);
   };
 
   const initializeChat = () => {
@@ -201,7 +173,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       if (success) {
         setNewMessage('');
         setMessageError('');
-        setShowEmojiPicker(false); // Close emoji picker after sending
         // Refresh conversations list to update last message
         await fetchConversations();
         // Message will be added via the real-time subscription
@@ -280,59 +251,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleDeleteConfirmation = (username: string) => {
     setShowDeleteConfirmation(username);
-  };
-
-  const handleToggleMessageLike = async (messageId: string) => {
-    if (!currentUser) {
-      alert('Please sign in or set a username to like messages');
-      return;
-    }
-
-    setTogglingLike(messageId);
-
-    try {
-      const success = await toggleChatMessageLike(messageId, currentUser);
-
-      if (success) {
-        // Optimistically update the UI
-        const currentLikeCount = messageLikeCounts[messageId] || 0;
-        const userHasLiked = userMessageLikes[messageId] || false;
-
-        if (userHasLiked) {
-          // User is removing their like
-          setMessageLikeCounts(prev => ({
-            ...prev,
-            [messageId]: Math.max(0, currentLikeCount - 1)
-          }));
-          setUserMessageLikes(prev => ({
-            ...prev,
-            [messageId]: false
-          }));
-        } else {
-          // User is adding a like
-          setMessageLikeCounts(prev => ({
-            ...prev,
-            [messageId]: currentLikeCount + 1
-          }));
-          setUserMessageLikes(prev => ({
-            ...prev,
-            [messageId]: true
-          }));
-        }
-      } else {
-        alert('Failed to update like status');
-      }
-    } catch (error) {
-      console.error('Error toggling message like:', error);
-      alert('Failed to update like status');
-    } finally {
-      setTogglingLike(null);
-    }
-  };
-
-  const handleEmojiClick = (emoji: string) => {
-    setNewMessage(prev => prev + emoji);
-    setShowEmojiPicker(false);
   };
 
   const formatTime = (timestamp: string) => {
@@ -570,114 +488,73 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                       
                       {/* Messages for this date */}
                       <div className="space-y-3">
-                        {dayMessages.map((message) => {
-                          const likeCount = messageLikeCounts[message.id] || 0;
-                          const userHasLiked = userMessageLikes[message.id] || false;
-
-                          return (
-                            <div
-                              key={message.id}
-                              className={`flex items-start space-x-3 group ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
-                            >
-                              {/* Profile picture for other users' messages */}
-                              {message.username !== currentUser && (
-                                <div className="flex-shrink-0">
-                                  {isGuestUser(message.username) ? (
-                                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                      <User className="w-4 h-4 text-white" />
-                                    </div>
-                                  ) : (
-                                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
-                                      {profilePictureCache[message.username] ? (
-                                        <img
-                                          src={profilePictureCache[message.username]!}
-                                          alt={`${message.username}'s profile`}
-                                          className="w-full h-full object-cover rounded-full"
-                                        />
-                                      ) : (
-                                        <User className="w-4 h-4 text-white" />
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="flex flex-col">
-                                <div
-                                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl relative ${
-                                    message.username === currentUser
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-gray-700 text-gray-200'
-                                  }`}
-                                >
-                                  <p className="text-sm break-words">{message.message}</p>
-                                  <div className="flex items-center justify-between mt-1">
-                                    <p className={`text-xs ${
-                                      message.username === currentUser ? 'text-blue-200' : 'text-gray-400'
-                                    }`}>
-                                      {formatTime(message.created_at)}
-                                    </p>
-                                    
-                                    {/* Like button - positioned in bottom right */}
-                                    <button
-                                      onClick={() => handleToggleMessageLike(message.id)}
-                                      disabled={togglingLike === message.id}
-                                      className={`ml-2 p-1 rounded-full transition-all duration-200 hover:scale-110 ${
-                                        userHasLiked
-                                          ? 'text-red-400 hover:text-red-300'
-                                          : message.username === currentUser
-                                            ? 'text-blue-200 hover:text-red-400'
-                                            : 'text-gray-400 hover:text-red-400'
-                                      } ${togglingLike === message.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                      title={userHasLiked ? 'Unlike message' : 'Like message'}
-                                    >
-                                      {togglingLike === message.id ? (
-                                        <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                      ) : (
-                                        <Heart
-                                          className={`w-3 h-3 ${userHasLiked ? 'fill-current' : ''}`}
-                                        />
-                                      )}
-                                    </button>
+                        {dayMessages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex items-start space-x-3 ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
+                          >
+                            {/* Profile picture for other users' messages */}
+                            {message.username !== currentUser && (
+                              <div className="flex-shrink-0">
+                                {isGuestUser(message.username) ? (
+                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-white" />
                                   </div>
-                                </div>
-                                
-                                {/* Like count below message */}
-                                {likeCount > 0 && (
-                                  <div className={`text-xs text-gray-400 mt-1 flex items-center space-x-1 ${
-                                    message.username === currentUser ? 'justify-end' : 'justify-start'
-                                  }`}>
-                                    <Heart className="w-3 h-3 text-red-400" />
-                                    <span>{likeCount}</span>
+                                ) : (
+                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                                    {profilePictureCache[message.username] ? (
+                                      <img
+                                        src={profilePictureCache[message.username]!}
+                                        alt={`${message.username}'s profile`}
+                                        className="w-full h-full object-cover rounded-full"
+                                      />
+                                    ) : (
+                                      <User className="w-4 h-4 text-white" />
+                                    )}
                                   </div>
                                 )}
                               </div>
+                            )}
 
-                              {/* Profile picture for current user's messages */}
-                              {message.username === currentUser && (
-                                <div className="flex-shrink-0">
-                                  {isGuestUser(currentUser) ? (
-                                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                                      <User className="w-4 h-4 text-white" />
-                                    </div>
-                                  ) : (
-                                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center overflow-hidden">
-                                      {profilePictureCache[currentUser] ? (
-                                        <img
-                                          src={profilePictureCache[currentUser]!}
-                                          alt="Your profile"
-                                          className="w-full h-full object-cover rounded-full"
-                                        />
-                                      ) : (
-                                        <User className="w-4 h-4 text-white" />
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                            <div
+                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                                message.username === currentUser
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-700 text-gray-200'
+                              }`}
+                            >
+                              <p className="text-sm">{message.message}</p>
+                              <p className={`text-xs mt-1 ${
+                                message.username === currentUser ? 'text-blue-200' : 'text-gray-400'
+                              }`}>
+                                {formatTime(message.created_at)}
+                              </p>
                             </div>
-                          );
-                        })}
+
+                            {/* Profile picture for current user's messages */}
+                            {message.username === currentUser && (
+                              <div className="flex-shrink-0">
+                                {isGuestUser(currentUser) ? (
+                                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-white" />
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center overflow-hidden">
+                                    {profilePictureCache[currentUser] ? (
+                                      <img
+                                        src={profilePictureCache[currentUser]!}
+                                        alt="Your profile"
+                                        className="w-full h-full object-cover rounded-full"
+                                      />
+                                    ) : (
+                                      <User className="w-4 h-4 text-white" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))
@@ -695,51 +572,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 </div>
               )}
 
-              {/* Emoji Picker */}
-              {showEmojiPicker && (
-                <div className="border-t border-gray-700 p-4 bg-gray-800">
-                  <div className="mb-3">
-                    <h4 className="text-sm font-medium text-gray-300 mb-2">Quick Emojis</h4>
-                    <div className="grid grid-cols-10 gap-2">
-                      {commonEmojis.map((emoji, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleEmojiClick(emoji)}
-                          className="w-8 h-8 text-lg hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    💡 Tip: You can also use your device's emoji keyboard (Windows: Win + .), or type emojis directly!
-                  </p>
-                </div>
-              )}
-
               {/* Message Input */}
               <div className="border-t border-gray-700 p-4">
                 <div className="flex space-x-3">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder={`Message ${recipientUsername}... (emojis supported! 😊)`}
-                      disabled={!isConnected || isLoading}
-                      className="w-full px-4 py-3 pr-12 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
-                    />
-                    {/* Emoji picker toggle button */}
-                    <button
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-700 rounded-full transition-colors"
-                      title="Open emoji picker"
-                    >
-                      <Smile className="w-4 h-4 text-gray-400 hover:text-gray-300" />
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={`Message ${recipientUsername}...`}
+                    disabled={!isConnected || isLoading}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
+                  />
                   <button
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() || !isConnected || isLoading}
