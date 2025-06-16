@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart } from 'lucide-react';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart, ArrowLeft } from 'lucide-react';
 import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
@@ -307,7 +307,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
                   onClick={() => setSelectedPost(null)}
                   className="p-2 hover:bg-white/20 rounded-full transition-colors"
                 >
-                  <X className="w-5 h-5 icon-shadow-white-sm" />
+                  <ArrowLeft className="w-5 h-5 icon-shadow-white-sm" />
                 </button>
                 <div className="flex items-center space-x-3">
                   {isGuestUser(selectedPost.author_username) ? (
