@@ -114,6 +114,83 @@
   animation: fadeInUp 0.3s ease-out;
 }
 
+/* Rainbow border animation for Editor's Choice */
+@keyframes rainbow-border {
+  0% {
+    border-color: #ff0000;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+  }
+  14.3% {
+    border-color: #ff8000;
+    box-shadow: 0 0 15px rgba(255, 128, 0, 0.4);
+  }
+  28.6% {
+    border-color: #ffff00;
+    box-shadow: 0 0 15px rgba(255, 255, 0, 0.4);
+  }
+  42.9% {
+    border-color: #80ff00;
+    box-shadow: 0 0 15px rgba(128, 255, 0, 0.4);
+  }
+  57.1% {
+    border-color: #00ff80;
+    box-shadow: 0 0 15px rgba(0, 255, 128, 0.4);
+  }
+  71.4% {
+    border-color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+  }
+  85.7% {
+    border-color: #8000ff;
+    box-shadow: 0 0 15px rgba(128, 0, 255, 0.4);
+  }
+  100% {
+    border-color: #ff0080;
+    box-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
+  }
+}
+
+/* Editor's Choice rainbow border effect */
+.editor-choice-border {
+  border: 3px solid #ff0000;
+  animation: rainbow-border 3s linear infinite;
+  position: relative;
+}
+
+.editor-choice-border::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: inherit;
+  background: linear-gradient(45deg, #ff0000, #ff8000, #ffff00, #80ff00, #00ff80, #00ffff, #8000ff, #ff0080);
+  background-size: 400% 400%;
+  animation: rainbow-background 3s linear infinite;
+  z-index: -1;
+  opacity: 0.1;
+}
+
+@keyframes rainbow-background {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Editor's Choice badge */
+.editor-choice-badge {
+  background: linear-gradient(45deg, #ff0000, #ff8000, #ffff00, #80ff00, #00ff80, #00ffff, #8000ff, #ff0080);
+  background-size: 400% 400%;
+  animation: rainbow-background 3s linear infinite;
+  color: white;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
 /* Glassmorphism utility - Original */
 .glass {
   background: rgba(255, 255, 255, 0.25);
@@ -238,5 +315,13 @@ textarea:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  
+  .rainbow-border,
+  .editor-choice-border,
+  .editor-choice-badge {
+    animation: none !important;
+    border-color: #8b5cf6 !important;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.5) !important;
   }
 }

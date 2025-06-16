@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, User, Heart, MessageCircle, Search, Filter, Globe, ChevronDown } from 'lucide-react';
-import { Pin, supabase, getProfileByUsername } from '../../lib/supabase';
+import { X, MapPin, User, Heart, MessageCircle, Search, Filter, Globe, ChevronDown, Star } from 'lucide-react';
+import { Pin, supabase, getProfileByUsername, updatePin } from '../../lib/supabase';
 import { getUniqueLocations } from '../../lib/geocoding';
 
 interface LocationFilters {
@@ -45,6 +45,8 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     localities: [] as string[],
   });
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [togglingEditorChoice, setTogglingEditorChoice] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -54,8 +56,35 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
       fetchEngagementData();
       setUniqueLocations(getUniqueLocations(pins));
       fetchProfilePictures();
+      checkAdminStatus();
     }
   }, [isOpen, pins]);
+
+  const checkAdminStatus = async () => {
+    if (!supabase) {
+      setIsAdminUser(false);
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdminUser(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      setIsAdminUser(profile?.role === 'admin');
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdminUser(false);
+    }
+  };
 
   const fetchProfilePictures = async () => {
     const usernames = [...new Set(pins.map(pin => pin.username))];
@@ -77,6 +106,36 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     }
 
     setProfilePictureCache(cache);
+  };
+
+  const handleToggleEditorChoice = async (pinId: string, currentStatus: boolean) => {
+    if (!isAdminUser) return;
+
+    setTogglingEditorChoice(pinId);
+
+    try {
+      const success = await updatePin(pinId, {
+        is_editor_choice: !currentStatus
+      });
+
+      if (success) {
+        // Update the local pins data
+        const updatedPins = pins.map(pin => 
+          pin.id === pinId 
+            ? { ...pin, is_editor_choice: !currentStatus }
+            : pin
+        );
+        // Force a re-render by triggering a state update in the parent component
+        window.location.reload(); // Temporary solution - in a real app you'd update the parent state
+      } else {
+        alert('Failed to update editor\'s choice status');
+      }
+    } catch (error) {
+      console.error('Error toggling editor choice:', error);
+      alert('Failed to update editor\'s choice status');
+    } finally {
+      setTogglingEditorChoice(null);
+    }
   };
 
   const fetchEngagementData = async () => {
@@ -127,6 +186,11 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
       return matchesSearch && matchesContinent && matchesCountry && matchesState && matchesLocality;
     })
     .sort((a, b) => {
+      // First, always sort by editor's choice status
+      if (a.is_editor_choice && !b.is_editor_choice) return -1;
+      if (!a.is_editor_choice && b.is_editor_choice) return 1;
+      
+      // Then sort by the selected criteria
       if (sortBy === 'newest') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } else if (sortBy === 'oldest') {
@@ -453,8 +517,22 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                 return (
                   <div
                     key={pin.id}
-                    className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 cursor-pointer group"
+                    className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 cursor-pointer group ${
+                      pin.is_editor_choice ? 'editor-choice-border' : ''
+                    }`}
                   >
+                    {/* Editor's Choice Badge */}
+                    {pin.is_editor_choice && (
+                      <div className="relative">
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
+                            <Star className="w-3 h-3" />
+                            <span>Editor's Choice</span>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Pin Image */}
                     {pin.images && pin.images.length > 0 && (
                       <div 
@@ -484,46 +562,73 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                     {/* Pin Content */}
                     <div className="p-4">
                       {/* User Info */}
-                      <div className="flex items-center space-x-2 mb-3">
-                        {isGuestUser(pin.username) ? (
-                          // Non-clickable version for guest users
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="w-4 h-4 text-white" />
-                          </div>
-                        ) : (
-                          // Clickable version for authenticated users with profile picture
-                          <button
-                            onClick={() => handleUserProfileClick(pin.username)}
-                            className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
-                          >
-                            {profilePicture ? (
-                              <img
-                                src={profilePicture}
-                                alt={`${pin.username}'s profile`}
-                                className="w-full h-full object-cover rounded-full"
-                              />
-                            ) : (
-                              <User className="w-4 h-4 text-white" />
-                            )}
-                          </button>
-                        )}
-                        <div className="flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
                           {isGuestUser(pin.username) ? (
                             // Non-clickable version for guest users
-                            <span className="font-medium text-sm text-gray-200 cursor-default">
-                              Guest {pin.username}
-                            </span>
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <User className="w-4 h-4 text-white" />
+                            </div>
                           ) : (
-                            // Clickable version for authenticated users
+                            // Clickable version for authenticated users with profile picture
                             <button
                               onClick={() => handleUserProfileClick(pin.username)}
-                              className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
+                              className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
                             >
-                              {pin.username}
+                              {profilePicture ? (
+                                <img
+                                  src={profilePicture}
+                                  alt={`${pin.username}'s profile`}
+                                  className="w-full h-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <User className="w-4 h-4 text-white" />
+                              )}
                             </button>
                           )}
-                          <p className="text-xs text-gray-400">{formatDate(pin.created_at)}</p>
+                          <div className="flex-1">
+                            {isGuestUser(pin.username) ? (
+                              // Non-clickable version for guest users
+                              <span className="font-medium text-sm text-gray-200 cursor-default">
+                                Guest {pin.username}
+                              </span>
+                            ) : (
+                              // Clickable version for authenticated users
+                              <button
+                                onClick={() => handleUserProfileClick(pin.username)}
+                                className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
+                              >
+                                {pin.username}
+                              </button>
+                            )}
+                            <p className="text-xs text-gray-400">{formatDate(pin.created_at)}</p>
+                          </div>
                         </div>
+
+                        {/* Admin Editor's Choice Toggle */}
+                        {isAdminUser && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleEditorChoice(pin.id, !!pin.is_editor_choice);
+                              }}
+                              disabled={togglingEditorChoice === pin.id}
+                              className={`p-1 rounded-full transition-colors ${
+                                pin.is_editor_choice
+                                  ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20'
+                                  : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-900/20'
+                              }`}
+                              title={pin.is_editor_choice ? "Remove from Editor's Choice" : "Set as Editor's Choice"}
+                            >
+                              {togglingEditorChoice === pin.id ? (
+                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <Star className={`w-3 h-3 ${pin.is_editor_choice ? 'fill-current' : ''}`} />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Location Info */}
@@ -580,6 +685,9 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
             )}
             {hasActiveLocationFilters && (
               <span className="ml-2 text-blue-400">• Location filtered</span>
+            )}
+            {isAdminUser && (
+              <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
             )}
           </div>
         </div>

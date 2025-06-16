@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername } from '../../lib/supabase';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star } from 'lucide-react';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
 interface BlogModalProps {
@@ -27,6 +27,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
+  const [togglingEditorChoice, setTogglingEditorChoice] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -100,6 +101,36 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
   };
 
+  const handleToggleEditorChoice = async (postId: string, currentStatus: boolean) => {
+    if (!isAdminUser) return;
+
+    setTogglingEditorChoice(postId);
+
+    try {
+      const success = await updateBlogPost(postId, {
+        is_editor_choice: !currentStatus
+      });
+
+      if (success) {
+        // Update the local posts data
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? { ...post, is_editor_choice: !currentStatus }
+              : post
+          )
+        );
+      } else {
+        alert('Failed to update editor\'s choice status');
+      }
+    } catch (error) {
+      console.error('Error toggling editor choice:', error);
+      alert('Failed to update editor\'s choice status');
+    } finally {
+      setTogglingEditorChoice(null);
+    }
+  };
+
   const handleEditPost = (post: BlogPost) => {
     setSelectedPost(null); // Close the detailed post view
     setPostToEdit(post);
@@ -127,7 +158,14 @@ const BlogModal: React.FC<BlogModalProps> = ({
     post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
     post.author_username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a, b) => {
+    // First, always sort by editor's choice status
+    if (a.is_editor_choice && !b.is_editor_choice) return -1;
+    if (!a.is_editor_choice && b.is_editor_choice) return 1;
+    
+    // Then sort by creation date (newest first)
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -385,9 +423,23 @@ const BlogModal: React.FC<BlogModalProps> = ({
                   return (
                     <div
                       key={post.id}
-                      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
+                      className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer ${
+                        post.is_editor_choice ? 'editor-choice-border' : ''
+                      }`}
                       onClick={() => setSelectedPost(post)}
                     >
+                      {/* Editor's Choice Badge */}
+                      {post.is_editor_choice && (
+                        <div className="relative">
+                          <div className="absolute top-2 left-2 z-10">
+                            <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
+                              <Star className="w-3 h-3" />
+                              <span>Editor's Choice</span>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="p-6">
                         {/* Post Header */}
                         <div className="flex items-start justify-between mb-4">
@@ -434,6 +486,30 @@ const BlogModal: React.FC<BlogModalProps> = ({
                               <Calendar className="w-3 h-3" />
                               <span>{formatDate(post.created_at)}</span>
                             </div>
+                            {/* Admin Editor's Choice Toggle */}
+                            {isAdminUser && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleEditorChoice(post.id, !!post.is_editor_choice);
+                                  }}
+                                  disabled={togglingEditorChoice === post.id}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    post.is_editor_choice
+                                      ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20'
+                                      : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-900/20'
+                                  }`}
+                                  title={post.is_editor_choice ? "Remove from Editor's Choice" : "Set as Editor's Choice"}
+                                >
+                                  {togglingEditorChoice === post.id ? (
+                                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Star className={`w-3 h-3 ${post.is_editor_choice ? 'fill-current' : ''}`} />
+                                  )}
+                                </button>
+                              </div>
+                            )}
                             {(canEditPost(post) || canDeletePost(post)) && (
                               <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {canEditPost(post) && (
@@ -508,7 +584,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
                 <span className="ml-2 text-blue-400">• Your posts</span>
               )}
               {isAdminUser && (
-                <span className="ml-2 text-red-400">• Admin privileges enabled</span>
+                <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
               )}
             </div>
           </div>

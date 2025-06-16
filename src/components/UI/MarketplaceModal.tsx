@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2 } from 'lucide-react';
-import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile, getProfileByUsername } from '../../lib/supabase';
+import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2, Star } from 'lucide-react';
+import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile, getProfileByUsername, updateMarketplaceItem } from '../../lib/supabase';
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
 import { chatService } from '../../lib/chatService';
@@ -33,6 +33,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   const [contactMessage, setContactMessage] = useState('');
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
+  const [togglingEditorChoice, setTogglingEditorChoice] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -99,6 +100,36 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
     }
   };
 
+  const handleToggleEditorChoice = async (itemId: string, currentStatus: boolean) => {
+    if (!isAdminUser) return;
+
+    setTogglingEditorChoice(itemId);
+
+    try {
+      const success = await updateMarketplaceItem(itemId, {
+        is_editor_choice: !currentStatus
+      });
+
+      if (success) {
+        // Update the local items data
+        setItems(prevItems =>
+          prevItems.map(item =>
+            item.id === itemId
+              ? { ...item, is_editor_choice: !currentStatus }
+              : item
+          )
+        );
+      } else {
+        alert('Failed to update editor\'s choice status');
+      }
+    } catch (error) {
+      console.error('Error toggling editor choice:', error);
+      alert('Failed to update editor\'s choice status');
+    } finally {
+      setTogglingEditorChoice(null);
+    }
+  };
+
   const handleEditItem = (item: MarketplaceItem) => {
     setItemToEdit(item);
     setIsCreateListingOpen(true);
@@ -136,6 +167,11 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       item.seller_username.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
+      // First, always sort by editor's choice status
+      if (a.is_editor_choice && !b.is_editor_choice) return -1;
+      if (!a.is_editor_choice && b.is_editor_choice) return 1;
+      
+      // Then sort by the selected criteria
       switch (sortBy) {
         case 'newest':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -319,9 +355,23 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer"
+                      className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer ${
+                        item.is_editor_choice ? 'editor-choice-border' : ''
+                      }`}
                       onClick={() => handleItemClick(item)}
                     >
+                      {/* Editor's Choice Badge */}
+                      {item.is_editor_choice && (
+                        <div className="relative">
+                          <div className="absolute top-2 left-2 z-10">
+                            <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
+                              <Star className="w-3 h-3" />
+                              <span>Editor's Choice</span>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Item Image */}
                       {item.images && item.images.length > 0 && (
                         <div className="relative h-48 overflow-hidden">
@@ -403,9 +453,35 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                               </button>
                             )}
                           </div>
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDate(item.created_at)}</span>
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(item.created_at)}</span>
+                            </div>
+                            {/* Admin Editor's Choice Toggle */}
+                            {isAdminUser && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleEditorChoice(item.id, !!item.is_editor_choice);
+                                  }}
+                                  disabled={togglingEditorChoice === item.id}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.is_editor_choice
+                                      ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20'
+                                      : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-900/20'
+                                  }`}
+                                  title={item.is_editor_choice ? "Remove from Editor's Choice" : "Set as Editor's Choice"}
+                                >
+                                  {togglingEditorChoice === item.id ? (
+                                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Star className={`w-3 h-3 ${item.is_editor_choice ? 'fill-current' : ''}`} />
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -546,7 +622,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                 <span className="ml-2 text-blue-400">• Sign in to sell items</span>
               )}
               {isAdminUser && (
-                <span className="ml-2 text-red-400">• Admin privileges enabled</span>
+                <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
               )}
             </div>
           </div>
