@@ -72,6 +72,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   };
 
   const handleEditPost = (post: BlogPost) => {
+    setSelectedPost(null); // Close the detailed post view
     setPostToEdit(post);
     setIsCreatePostOpen(true);
   };
