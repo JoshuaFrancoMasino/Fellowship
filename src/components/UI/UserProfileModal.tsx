@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Image as ImageIcon } from 'lucide-react';
+import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus } from 'lucide-react';
 import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase } from '../../lib/supabase';
 
 interface UserProfileModalProps {
@@ -31,13 +31,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPinsExpanded, setIsPinsExpanded] = useState(false);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
-  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editAboutMe, setEditAboutMe] = useState('');
   const [editContactInfo, setEditContactInfo] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
-  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = username === currentUser;
   const isGuestUser = username.match(/^\d{7}$/);
@@ -128,12 +126,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const handleBannerClick = () => {
-    if (isOwnProfile && isAuthenticated && !isGuestUser && bannerInputRef.current) {
-      bannerInputRef.current.click();
-    }
-  };
-
   const handleProfilePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !isAuthenticated || !userProfile || isGuestUser) return;
@@ -191,67 +183,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       // Reset file input
       if (profilePictureInputRef.current) {
         profilePictureInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleBannerChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !isAuthenticated || !userProfile || isGuestUser) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
-      return;
-    }
-
-    setIsUploadingBanner(true);
-
-    try {
-      console.log('📤 Starting banner upload...');
-      
-      // Upload image to profile-pictures bucket
-      const path = await uploadImage(file, userProfile.id, 'profile-pictures');
-      
-      if (!path) {
-        throw new Error('Failed to upload image');
-      }
-
-      console.log('✅ Banner uploaded successfully:', path);
-
-      // Get public URL
-      const publicUrl = getImageUrl(path, 'profile-pictures');
-      console.log('🔗 Public URL generated:', publicUrl);
-
-      // Update user profile with new banner URL
-      const updateSuccess = await updateUserProfile(userProfile.id, {
-        banner_url: publicUrl
-      });
-
-      if (!updateSuccess) {
-        throw new Error('Failed to update profile');
-      }
-
-      console.log('✅ Profile updated successfully');
-
-      // Re-fetch profile data to update UI
-      await fetchProfileData();
-      
-      alert('Banner updated successfully!');
-    } catch (error) {
-      console.error('❌ Error updating banner:', error);
-      alert('Failed to update banner. Please try again.');
-    } finally {
-      setIsUploadingBanner(false);
-      // Reset file input
-      if (bannerInputRef.current) {
-        bannerInputRef.current.value = '';
       }
     }
   };
@@ -317,36 +248,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         )}
 
         {/* Banner Section */}
-        <div className="relative h-48 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
-          {/* Banner Image */}
-          {userProfile?.banner_url && !isGuestUser ? (
-            <img
-              src={userProfile.banner_url}
-              alt="Profile banner"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500" />
-          )}
-
-          {/* Banner Upload Overlay */}
-          {isOwnProfile && isAuthenticated && !isGuestUser && (
-            <button
-              onClick={handleBannerClick}
-              disabled={isUploadingBanner}
-              className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center group"
-            >
-              {isUploadingBanner ? (
-                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <div className="flex items-center space-x-2 text-white">
-                  <ImageIcon className="w-6 h-6" />
-                  <span className="font-medium">Change Banner</span>
-                </div>
-              )}
-            </button>
-          )}
-          
+        <div className="relative h-32 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
           {/* Close Button */}
           <button
             onClick={onClose}
@@ -354,23 +256,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           >
             <X className="w-5 h-5 icon-shadow-white-sm" />
           </button>
-
-          {/* Hidden Banner File Input */}
-          <input
-            ref={bannerInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleBannerChange}
-            className="hidden"
-          />
         </div>
 
         {/* Scrollable Content Container */}
-        <div className="flex-1 overflow-y-auto max-h-[calc(90vh-320px)]">
+        <div className="flex-1 overflow-y-auto max-h-[calc(90vh-256px)]">
           {/* Profile Header */}
           <div className="relative px-6 pb-6">
             {/* Profile Picture - overlapping banner */}
-            <div className="absolute top-12 left-6">
+            <div className="absolute -top-16 left-6">
               <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
@@ -415,7 +308,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
 
             {/* Profile Info - adjusted for larger profile picture */}
-            <div className="pt-44 ml-48">
+            <div className="pt-20 ml-48">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
