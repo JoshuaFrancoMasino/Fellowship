@@ -144,6 +144,33 @@ class ChatService {
     }
   }
 
+  async deleteConversation(otherUsername: string): Promise<boolean> {
+    if (!supabase || !this.isAuthenticated) {
+      console.error('❌ Supabase not available or user not authenticated');
+      return false;
+    }
+
+    try {
+      const conversationId = this.getConversationId(this.currentUser, otherUsername);
+      
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('pin_id', conversationId);
+
+      if (error) {
+        console.error('❌ Error deleting conversation:', error);
+        return false;
+      }
+
+      console.log('✅ Conversation deleted successfully');
+      return true;
+    } catch (err) {
+      console.error('💥 Failed to delete conversation:', err);
+      return false;
+    }
+  }
+
   subscribeToConversation(otherUsername: string, onMessage: (message: ChatMessage) => void) {
     if (!supabase) {
       console.error('❌ Supabase not available');
