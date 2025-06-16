@@ -32,6 +32,8 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [authorProfilePicture, setAuthorProfilePicture] = useState<string | null>(null);
+  const [commentProfilePictures, setCommentProfilePictures] = useState<{ [key: string]: string | null }>({});
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -42,6 +44,12 @@ const PinPopup: React.FC<PinPopupProps> = ({
     fetchLikes();
     fetchAuthorProfilePicture();
   }, [pin.id, currentUser, pin.username]);
+
+  useEffect(() => {
+    if (comments.length > 0) {
+      fetchCommentProfilePictures();
+    }
+  }, [comments]);
 
   const fetchAuthorProfilePicture = async () => {
     if (isGuestUser(pin.username)) {
@@ -56,6 +64,28 @@ const PinPopup: React.FC<PinPopupProps> = ({
       console.error('Error fetching author profile picture:', error);
       setAuthorProfilePicture(null);
     }
+  };
+
+  const fetchCommentProfilePictures = async () => {
+    const usernames = [...new Set(comments.map(comment => comment.username))];
+    const cache: { [key: string]: string | null } = {};
+
+    // Fetch profile pictures for non-guest users
+    for (const username of usernames) {
+      if (!isGuestUser(username)) {
+        try {
+          const profile = await getProfileByUsername(username);
+          cache[username] = profile?.profile_picture_url || null;
+        } catch (error) {
+          console.error(`Error fetching profile picture for ${username}:`, error);
+          cache[username] = null;
+        }
+      } else {
+        cache[username] = null; // Guest users don't have profile pictures
+      }
+    }
+
+    setCommentProfilePictures(cache);
   };
 
   const fetchComments = async () => {
@@ -115,6 +145,36 @@ const PinPopup: React.FC<PinPopupProps> = ({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!supabase) {
+      alert('Cannot delete comment - database connection unavailable.');
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+
+    try {
+      console.log('🗑️ Deleting comment:', commentId);
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (error) {
+        console.error('❌ Error deleting comment:', error);
+        alert('Failed to delete comment. Please try again.');
+      } else {
+        console.log('✅ Comment deleted successfully');
+        fetchComments(); // Refresh comments list
+      }
+    } catch (err) {
+      console.error('💥 Failed to delete comment:', err);
+      alert('Failed to delete comment - database connection unavailable.');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   const handleLike = async (imageIndex: number) => {
     console.log('👆 Like button clicked for image index:', imageIndex);
     console.log('🔍 Current user likes state:', userLikes);
@@ -138,6 +198,11 @@ const PinPopup: React.FC<PinPopupProps> = ({
 
   const canDelete = pin.username === currentUser || isAdmin;
   const canEdit = pin.username === currentUser || isAdmin;
+
+  // Check if user can delete a specific comment
+  const canDeleteComment = (comment: Comment) => {
+    return comment.username === currentUser || isAdmin;
+  };
 
   // Calculate total likes across all images
   const totalLikes = Object.values(likes).reduce((sum, count) => sum + count, 0);
@@ -373,25 +438,79 @@ const PinPopup: React.FC<PinPopupProps> = ({
         </div>
 
         {/* Comments list */}
-        <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
+        <div className="space-y-3 mb-3 max-h-32 overflow-y-auto">
           {comments.map((comment) => {
+            const commentProfilePicture = commentProfilePictures[comment.username];
+            const canDeleteThisComment = canDeleteComment(comment);
+            const isDeletingThisComment = deletingCommentId === comment.id;
+
             return (
-              <div key={comment.id} className="text-sm">
-                {isGuestUser(comment.username) ? (
-                  // Non-clickable version for guest users
-                  <span className="font-medium text-blue-400 cursor-default">
-                    Guest {comment.username}
-                  </span>
-                ) : (
-                  // Clickable version for authenticated users
-                  <button
-                    onClick={() => handleUserProfileClick(comment.username)}
-                    className="font-medium text-blue-400 hover:underline"
-                  >
-                    {comment.username}
-                  </button>
+              <div key={comment.id} className="flex items-start space-x-2 group">
+                {/* Profile Picture */}
+                <div className="flex-shrink-0">
+                  {isGuestUser(comment.username) ? (
+                    <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <User className="w-3 h-3 text-white" />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleUserProfileClick(comment.username)}
+                      className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
+                    >
+                      {commentProfilePicture ? (
+                        <img
+                          src={commentProfilePicture}
+                          alt={`${comment.username}'s profile`}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <User className="w-3 h-3 text-white" />
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Comment Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">
+                    {isGuestUser(comment.username) ? (
+                      // Non-clickable version for guest users
+                      <span className="font-medium text-blue-400 cursor-default">
+                        Guest {comment.username}
+                      </span>
+                    ) : (
+                      // Clickable version for authenticated users
+                      <button
+                        onClick={() => handleUserProfileClick(comment.username)}
+                        className="font-medium text-blue-400 hover:underline"
+                      >
+                        {comment.username}
+                      </button>
+                    )}
+                    <span className="text-gray-200 ml-2">{comment.text}</span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {formatDate(comment.created_at)}
+                  </div>
+                </div>
+
+                {/* Delete Button */}
+                {canDeleteThisComment && (
+                  <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      disabled={isDeletingThisComment}
+                      className="p-1 hover:bg-red-600 rounded-full transition-colors disabled:opacity-50"
+                      title={isAdmin && comment.username !== currentUser ? "Delete comment (Admin)" : "Delete your comment"}
+                    >
+                      {isDeletingThisComment ? (
+                        <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                      )}
+                    </button>
+                  </div>
                 )}
-                <span className="text-gray-200 ml-2">{comment.text}</span>
               </div>
             );
           })}
