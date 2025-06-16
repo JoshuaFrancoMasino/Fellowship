@@ -370,7 +370,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           {/* Profile Header */}
           <div className="relative px-6 pb-6">
             {/* Profile Picture - overlapping banner */}
-            <div className="absolute -top-16 left-6">
+            <div className="absolute -top-16 left-6 z-20">
               <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg">
                 <button
                   onClick={handleProfilePictureClick}
