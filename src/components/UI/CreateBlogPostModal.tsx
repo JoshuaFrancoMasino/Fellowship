@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, BookOpen, Save, Eye, EyeOff, AlertCircle, Image, Video, Upload } from 'lucide-react';
+import { X, BookOpen, Save, Eye, EyeOff, AlertCircle, Image, Upload } from 'lucide-react';
 import { createBlogPost, updateBlogPost, BlogPost, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
 
 interface CreateBlogPostModalProps {
@@ -25,8 +25,6 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [showVideoInput, setShowVideoInput] = useState(false);
-  const [videoUrl, setVideoUrl] = useState('');
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,8 +48,6 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
       
       // Reset other form states
       setSubmitError(null);
-      setShowVideoInput(false);
-      setVideoUrl('');
     }
   }, [isOpen, initialPost]);
 
@@ -60,8 +56,6 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     setContent('');
     setIsPublished(false);
     setSubmitError(null);
-    setShowVideoInput(false);
-    setVideoUrl('');
   };
 
   const insertAtCursor = (textToInsert: string) => {
@@ -130,46 +124,6 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
         fileInputRef.current.value = '';
       }
     }
-  };
-
-  const parseVideoUrl = (url: string): string | null => {
-    // YouTube URL patterns
-    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const youtubeMatch = url.match(youtubeRegex);
-    
-    if (youtubeMatch) {
-      const videoId = youtubeMatch[1];
-      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width: 100%; margin: 10px 0;"></iframe>`;
-    }
-
-    // Vimeo URL patterns
-    const vimeoRegex = /(?:vimeo\.com\/)([0-9]+)/;
-    const vimeoMatch = url.match(vimeoRegex);
-    
-    if (vimeoMatch) {
-      const videoId = vimeoMatch[1];
-      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="max-width: 100%; margin: 10px 0;"></iframe>`;
-    }
-
-    return null;
-  };
-
-  const handleEmbedVideo = () => {
-    if (!videoUrl.trim()) {
-      alert('Please enter a video URL');
-      return;
-    }
-
-    const videoEmbed = parseVideoUrl(videoUrl.trim());
-    
-    if (!videoEmbed) {
-      alert('Please enter a valid YouTube or Vimeo URL');
-      return;
-    }
-
-    insertAtCursor(videoEmbed);
-    setVideoUrl('');
-    setShowVideoInput(false);
   };
 
   const handleSubmit = async () => {
@@ -379,16 +333,6 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
                 <span>{isUploadingImage ? 'Uploading...' : 'Upload Image'}</span>
               </button>
 
-              {/* Video Embed Button */}
-              <button
-                type="button"
-                onClick={() => setShowVideoInput(!showVideoInput)}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                <Video className="w-4 h-4" />
-                <span>Embed Video</span>
-              </button>
-
               {/* Hidden File Input */}
               <input
                 ref={fileInputRef}
@@ -399,53 +343,14 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
               />
             </div>
 
-            {/* Video URL Input */}
-            {showVideoInput && (
-              <div className="mt-3 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Video URL (YouTube or Vimeo)
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="url"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleEmbedVideo}
-                    disabled={!videoUrl.trim()}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
-                  >
-                    Add Video
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowVideoInput(false);
-                      setVideoUrl('');
-                    }}
-                    className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-gray-200 rounded-lg transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Paste a YouTube or Vimeo URL to embed the video in your blog post
-                </p>
-              </div>
-            )}
-
             {/* Media Instructions */}
             <div className="mt-3 text-xs text-gray-400">
               <p>💡 <strong>Tips:</strong></p>
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li>Click "Upload Image" to add photos directly from your device</li>
-                <li>Click "Embed Video" to add YouTube or Vimeo videos</li>
-                <li>Images and videos will be inserted at your cursor position</li>
-                <li>You can mix text, images, and videos in any order</li>
+                <li>Images will be inserted at your cursor position</li>
+                <li>You can mix text and images in any order</li>
+                <li>Use HTML formatting for advanced styling</li>
               </ul>
             </div>
           </div>
