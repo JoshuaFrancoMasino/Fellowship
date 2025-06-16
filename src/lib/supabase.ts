@@ -25,6 +25,7 @@ export type Pin = {
   pin_color?: string;
   storage_paths?: string[];
   is_authenticated?: boolean;
+  is_editor_choice?: boolean;
   created_at: string;
   likes_count?: number;
   comments_count?: number;
@@ -79,6 +80,7 @@ export type MarketplaceItem = {
   price: number;
   images: string[];
   storage_paths: string[];
+  is_editor_choice?: boolean;
   created_at: string;
   updated_at: string;
   is_active: boolean;
@@ -90,6 +92,7 @@ export type BlogPost = {
   title: string;
   content: string;
   excerpt?: string;
+  is_editor_choice?: boolean;
   created_at: string;
   updated_at: string;
   is_published: boolean;
@@ -272,6 +275,7 @@ export const getMarketplaceItems = async (): Promise<MarketplaceItem[]> => {
       .from('marketplace_items')
       .select('*')
       .eq('is_active', true)
+      .order('is_editor_choice', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -397,6 +401,7 @@ export const getBlogPosts = async (publishedOnly: boolean = true): Promise<BlogP
     let query = supabase
       .from('blog_posts')
       .select('*')
+      .order('is_editor_choice', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (publishedOnly) {
@@ -542,5 +547,25 @@ export const getBlogPost = async (postId: string): Promise<BlogPost | null> => {
   } catch (err) {
     console.error('Failed to fetch blog post:', err);
     return null;
+  }
+};
+
+// Pin update function
+export const updatePin = async (
+  pinId: string,
+  updates: Partial<Pin>
+): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('pins')
+      .update(updates)
+      .eq('id', pinId);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to update pin:', err);
+    return false;
   }
 };
