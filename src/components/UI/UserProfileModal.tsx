@@ -247,21 +247,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </div>
         )}
 
-        {/* Banner Section */}
-        <div className="relative h-32 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
+        {/* Banner Section - Reduced height from h-32 to h-8 */}
+        <div className="relative h-8 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 glass-white hover:bg-white/20 rounded-full text-white transition-colors"
+            className="absolute top-1 right-1 p-1 glass-white hover:bg-white/20 rounded-full text-white transition-colors"
           >
-            <X className="w-5 h-5 icon-shadow-white-sm" />
+            <X className="w-4 h-4 icon-shadow-white-sm" />
           </button>
         </div>
 
         {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto max-h-[calc(90vh-256px)]">
           {/* Profile Header */}
-          <div className="px-6 pb-6 -mt-16 flex items-center space-x-4">
+          <div className="px-6 pb-6 pt-6 flex items-center space-x-4">
             {/* Profile Picture */}
             <div className="w-32 h-32 bg-gray-800 rounded-full p-1 shadow-lg flex-shrink-0">
               <button
