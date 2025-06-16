@@ -184,18 +184,35 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     try {
       if (isEditMode && initialPost) {
         // Update existing post
-        await updateBlogPost(initialPost.id, {
+        const success = await updateBlogPost(initialPost.id, {
           title: title.trim(),
           content: content.trim(),
           is_published: isPublished,
         });
+        
+        if (!success) {
+          throw new Error('Failed to update blog post');
+        }
       } else {
         // Create new post
-        await createBlogPost(title.trim(), content.trim(), isPublished);
+        const result = await createBlogPost(title.trim(), content.trim(), isPublished);
+        
+        if (!result) {
+          throw new Error('Failed to create blog post');
+        }
       }
       
+      // Success - reset form and close modal
       resetForm();
-      onSuccess();
+      onSuccess(); // This will refresh the blog list
+      onClose(); // Close the modal
+      
+      // Show success message
+      setTimeout(() => {
+        const action = isEditMode ? 'updated' : isPublished ? 'published' : 'saved as draft';
+        alert(`Blog post ${action} successfully!`);
+      }, 100);
+      
     } catch (error: any) {
       console.error(`Failed to ${isEditMode ? 'update' : 'create'} blog post:`, error);
       setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} blog post. Please try again.`);
