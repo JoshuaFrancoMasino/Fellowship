@@ -8,52 +8,13 @@ interface AuthPageProps {
 
 const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
   const [isSignUp, setIsSignUp] = useState(true); // Default to sign up for guest users
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // Can be email or username
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [optInUpdates, setOptInUpdates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
-
-  // Helper function to check if input looks like an email
-  const isEmail = (input: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
-  };
-
-  // Helper function to resolve username to email
-  const resolveUsernameToEmail = async (identifier: string): Promise<string | null> => {
-    if (isEmail(identifier)) {
-      return identifier; // Already an email
-    }
-
-    try {
-      // Look up the user by username in the profiles table
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', identifier)
-        .single();
-
-      if (error || !data) {
-        return null; // Username not found
-      }
-
-      // Get the user's email from auth.users table using the profile ID
-      // Note: This requires RLS policies that allow reading user data
-      // In a production environment, this should be done server-side
-      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(data.id);
-      
-      if (userError || !userData.user) {
-        return null;
-      }
-
-      return userData.user.email || null;
-    } catch (err) {
-      console.error('Error resolving username to email:', err);
-      return null;
-    }
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,13 +23,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
 
     try {
       if (isSignUp) {
-        // For sign up, we need a valid email address
-        if (!isEmail(loginIdentifier)) {
-          throw new Error('Please enter a valid email address for sign up');
-        }
-
         const { error } = await supabase.auth.signUp({
-          email: loginIdentifier,
+          email,
           password,
           options: {
             data: {
@@ -83,30 +39,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
         // Show email confirmation message instead of auto-signing in
         setShowEmailConfirmation(true);
       } else {
-        // For sign in, resolve username to email if needed
-        let emailToUse = loginIdentifier;
-        
-        if (!isEmail(loginIdentifier)) {
-          // Try to resolve username to email
-          const resolvedEmail = await resolveUsernameToEmail(loginIdentifier);
-          if (!resolvedEmail) {
-            throw new Error('Username not found. Please check your username or use your email address.');
-          }
-          emailToUse = resolvedEmail;
-        }
-
         const { error } = await supabase.auth.signInWithPassword({
-          email: emailToUse,
+          email,
           password,
         });
         
-        if (error) {
-          // Provide more user-friendly error messages
-          if (error.message.includes('Invalid login credentials')) {
-            throw new Error('Invalid username/email or password. Please check your credentials and try again.');
-          }
-          throw error;
-        }
+        if (error) throw error;
         
         // The App component will handle closing the auth page via onAuthStateChange
       }
@@ -135,7 +73,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
             <h2 className="text-2xl font-bold text-gray-200 mb-4">Check Your Email</h2>
             
             <p className="text-gray-400 mb-6">
-              We've sent a confirmation link to <strong className="text-gray-200">{loginIdentifier}</strong>. 
+              We've sent a confirmation link to <strong className="text-gray-200">{email}</strong>. 
               Please check your email and click the link to verify your account.
             </p>
             
@@ -160,7 +98,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
               onClick={() => {
                 setShowEmailConfirmation(false);
                 setIsSignUp(false);
-                setLoginIdentifier('');
+                setEmail('');
                 setPassword('');
                 setUsername('');
                 setOptInUpdates(false);
@@ -243,24 +181,19 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-200 mb-2">
-                {isSignUp ? 'Email' : 'Email or Username'}
+                Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={isSignUp ? "email" : "text"}
-                  value={loginIdentifier}
-                  onChange={(e) => setLoginIdentifier(e.target.value)}
-                  placeholder={isSignUp ? "Enter your email" : "Enter your email or username"}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
                   required
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
                 />
               </div>
-              {!isSignUp && (
-                <p className="text-xs text-gray-400 mt-1">
-                  You can sign in with either your email address or username
-                </p>
-              )}
             </div>
 
             <div>
