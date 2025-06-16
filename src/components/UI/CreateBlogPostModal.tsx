@@ -33,22 +33,27 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
 
   const isEditMode = !!initialPost;
 
+  // Updated useEffect to properly initialize form when modal opens
   useEffect(() => {
-    if (initialPost) {
-      // Editing mode - populate form with existing data
-      setTitle(initialPost.title);
-      setContent(initialPost.content);
-      setIsPublished(initialPost.is_published);
-    } else {
-      // Creating mode - reset form
-      setTitle('');
-      setContent('');
-      setIsPublished(false);
+    if (isOpen) {
+      if (initialPost) {
+        // Editing mode - populate form with existing data
+        setTitle(initialPost.title);
+        setContent(initialPost.content);
+        setIsPublished(initialPost.is_published);
+      } else {
+        // Creating mode - reset form to defaults
+        setTitle('');
+        setContent('');
+        setIsPublished(false);
+      }
+      
+      // Reset other form states
+      setSubmitError(null);
+      setShowVideoInput(false);
+      setVideoUrl('');
     }
-    setSubmitError(null);
-    setShowVideoInput(false);
-    setVideoUrl('');
-  }, [initialPost]);
+  }, [isOpen, initialPost]);
 
   const resetForm = () => {
     setTitle('');
