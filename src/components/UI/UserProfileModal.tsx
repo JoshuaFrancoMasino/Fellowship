@@ -247,8 +247,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </div>
         )}
 
-        {/* Banner Section - Reduced height from h-32 to h-8 */}
-        <div className="relative h-8 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
+        {/* Banner Section - Changed from h-8 to h-16 */}
+        <div className="relative h-16 bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 flex-shrink-0 overflow-hidden">
           {/* Close Button */}
           <button
             onClick={onClose}
