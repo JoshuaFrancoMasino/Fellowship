@@ -283,7 +283,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const handleUserProfileClick = (username: string) => {
     // Only allow profile clicks for non-guest users
     if (!isGuestUser(username)) {
-      onOpenUserProfile(username);
+      onClose(); // Close the blog modal first
+      onOpenUserProfile(username); // Then open the user profile
     }
   };
 

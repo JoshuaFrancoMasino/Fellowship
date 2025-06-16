@@ -285,7 +285,8 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
   const handleUserProfileClick = (username: string) => {
     // Only allow profile clicks for non-guest users
     if (!isGuestUser(username)) {
-      onOpenUserProfile(username);
+      onClose(); // Close the explore modal first
+      onOpenUserProfile(username); // Then open the user profile
     }
   };
 
@@ -572,7 +573,10 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                           ) : (
                             // Clickable version for authenticated users with profile picture
                             <button
-                              onClick={() => handleUserProfileClick(pin.username)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUserProfileClick(pin.username);
+                              }}
                               className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
                             >
                               {profilePicture ? (
@@ -595,7 +599,10 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                             ) : (
                               // Clickable version for authenticated users
                               <button
-                                onClick={() => handleUserProfileClick(pin.username)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(pin.username);
+                                }}
                                 className="font-medium text-sm text-gray-200 hover:text-blue-400 transition-colors"
                               >
                                 {pin.username}

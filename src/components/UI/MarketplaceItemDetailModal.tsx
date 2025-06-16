@@ -13,6 +13,7 @@ interface MarketplaceItemDetailModalProps {
   onEditItem: (item: MarketplaceItem) => void;
   onDeleteItem: (itemId: string) => void;
   isAdminUser: boolean;
+  onOpenUserProfile: (username: string) => void;
 }
 
 const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
@@ -25,6 +26,7 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   onEditItem,
   onDeleteItem,
   isAdminUser,
+  onOpenUserProfile,
 }) => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [contactMessage, setContactMessage] = useState('');
@@ -144,6 +146,14 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   const handleDeleteClick = () => {
     onDeleteItem(item.id);
     onClose();
+  };
+
+  const handleUserProfileClick = (username: string) => {
+    // Only allow profile clicks for non-guest users
+    if (!isGuestUser(username)) {
+      onClose(); // Close the item detail modal first
+      onOpenUserProfile(username); // Then open the user profile
+    }
   };
 
   const isOwnListing = item.seller_username === currentUser;
@@ -277,7 +287,10 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
                     <User className="w-4 h-4 text-white" />
                   </div>
                 ) : (
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                  <button
+                    onClick={() => handleUserProfileClick(item.seller_username)}
+                    className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden hover:scale-105 transition-transform"
+                  >
                     {sellerProfilePicture ? (
                       <img
                         src={sellerProfilePicture}
@@ -287,12 +300,21 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
                     ) : (
                       <User className="w-4 h-4 text-white" />
                     )}
-                  </div>
+                  </button>
                 )}
                 <div>
-                  <p className="font-medium text-gray-200">
-                    {item.seller_username.match(/^\d{7}$/) ? `Guest ${item.seller_username}` : item.seller_username}
-                  </p>
+                  {isGuestUser(item.seller_username) ? (
+                    <p className="font-medium text-gray-200">
+                      Guest {item.seller_username}
+                    </p>
+                  ) : (
+                    <button
+                      onClick={() => handleUserProfileClick(item.seller_username)}
+                      className="font-medium text-gray-200 hover:text-blue-400 transition-colors"
+                    >
+                      {item.seller_username}
+                    </button>
+                  )}
                   <div className="flex items-center space-x-1 text-xs text-gray-400">
                     <Calendar className="w-3 h-3" />
                     <span>Listed {formatDate(item.created_at)}</span>

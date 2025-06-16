@@ -229,7 +229,8 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const handleUserProfileClick = (username: string) => {
     // Only allow profile clicks for non-guest users
     if (!isGuestUser(username)) {
-      onOpenUserProfile(username);
+      onClose(); // Close the pin popup first
+      onOpenUserProfile(username); // Then open the user profile
     }
   };
 

@@ -257,7 +257,8 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   const handleUserProfileClick = (username: string) => {
     // Only allow profile clicks for non-guest users
     if (!isGuestUser(username)) {
-      onOpenUserProfile(username);
+      onClose(); // Close the marketplace modal first
+      onOpenUserProfile(username); // Then open the user profile
     }
   };
 
@@ -664,6 +665,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         onEditItem={handleEditItem}
         onDeleteItem={handleDeleteItem}
         isAdminUser={isAdminUser}
+        onOpenUserProfile={onOpenUserProfile}
       />
     </>
   );
