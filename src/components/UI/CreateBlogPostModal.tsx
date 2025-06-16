@@ -228,8 +228,13 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      onClose();
+      handleCloseModal();
     }
+  };
+
+  const handleCloseModal = () => {
+    resetForm();
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -252,7 +257,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
                 </div>
               </div>
               <button
-                onClick={onClose}
+                onClick={handleCloseModal}
                 className="p-2 hover:bg-white/20 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 icon-shadow-white-sm" />
@@ -265,7 +270,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
             </p>
             <button
               onClick={() => {
-                onClose();
+                handleCloseModal();
                 window.dispatchEvent(new CustomEvent('openAuth'));
               }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
@@ -301,10 +306,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
               </div>
             </div>
             <button
-              onClick={() => {
-                resetForm();
-                onClose();
-              }}
+              onClick={handleCloseModal}
               className="p-2 hover:bg-white/20 rounded-full transition-colors"
             >
               <X className="w-5 h-5 icon-shadow-white-sm" />
@@ -488,10 +490,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
           {/* Actions */}
           <div className="flex space-x-3">
             <button
-              onClick={() => {
-                resetForm();
-                onClose();
-              }}
+              onClick={handleCloseModal}
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
