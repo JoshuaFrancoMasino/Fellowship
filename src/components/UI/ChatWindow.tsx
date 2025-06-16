@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2 } from 'lucide-react';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2, Heart } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
-import { getProfileByUsername, getCurrentUserProfile } from '../../lib/supabase';
+import { getProfileByUsername, getCurrentUserProfile, toggleChatMessageLike, getChatMessageLikeCounts, getUserChatMessageLikes } from '../../lib/supabase';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -31,6 +31,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [profilePictureCache, setProfilePictureCache] = useState<{ [key: string]: string | null }>({});
   const [deletingConversation, setDeletingConversation] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<string | null>(null);
+  const [messageLikeCounts, setMessageLikeCounts] = useState<{ [key: string]: number }>({});
+  const [userMessageLikes, setUserMessageLikes] = useState<{ [key: string]: boolean }>({});
+  const [togglingLike, setTogglingLike] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Check if username is a guest user (7-digit number)
@@ -71,6 +74,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [conversations, viewingConversation, recipientUsername, messages, currentUser]);
 
+  // Fetch like data when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      fetchMessageLikeData();
+    }
+  }, [messages, currentUser]);
+
   const fetchProfilePictures = async () => {
     const usernames = new Set<string>();
 
@@ -109,6 +119,83 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
 
     setProfilePictureCache(cache);
+  };
+
+  const fetchMessageLikeData = async () => {
+    if (messages.length === 0) return;
+
+    const messageIds = messages.map(msg => msg.id);
+
+    try {
+      // Fetch like counts for all messages
+      const likeCounts = await getChatMessageLikeCounts(messageIds);
+      setMessageLikeCounts(likeCounts);
+
+      // Fetch user's likes for these messages
+      if (currentUser) {
+        const userLikes = await getUserChatMessageLikes(messageIds, currentUser);
+        setUserMessageLikes(userLikes);
+      }
+    } catch (error) {
+      console.error('Error fetching message like data:', error);
+    }
+  };
+
+  const handleToggleMessageLike = async (messageId: string) => {
+    if (!currentUser) {
+      alert('Please sign in to like messages');
+      return;
+    }
+
+    setTogglingLike(messageId);
+
+    // Optimistic UI updates
+    const currentLikeCount = messageLikeCounts[messageId] || 0;
+    const userHasLiked = userMessageLikes[messageId] || false;
+
+    const newLikeCount = userHasLiked ? currentLikeCount - 1 : currentLikeCount + 1;
+    const newUserLikeStatus = !userHasLiked;
+
+    // Update UI immediately
+    setMessageLikeCounts(prev => ({
+      ...prev,
+      [messageId]: Math.max(0, newLikeCount)
+    }));
+    setUserMessageLikes(prev => ({
+      ...prev,
+      [messageId]: newUserLikeStatus
+    }));
+
+    try {
+      const success = await toggleChatMessageLike(messageId, currentUser);
+
+      if (!success) {
+        // Revert optimistic updates on failure
+        setMessageLikeCounts(prev => ({
+          ...prev,
+          [messageId]: currentLikeCount
+        }));
+        setUserMessageLikes(prev => ({
+          ...prev,
+          [messageId]: userHasLiked
+        }));
+        alert('Failed to update like status');
+      }
+    } catch (error) {
+      console.error('Error toggling message like:', error);
+      // Revert optimistic updates on error
+      setMessageLikeCounts(prev => ({
+        ...prev,
+        [messageId]: currentLikeCount
+      }));
+      setUserMessageLikes(prev => ({
+        ...prev,
+        [messageId]: userHasLiked
+      }));
+      alert('Failed to update like status');
+    } finally {
+      setTogglingLike(null);
+    }
   };
 
   const initializeChat = () => {
@@ -213,6 +300,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     setRecipientUsername('');
     setMessages([]);
     setMessageError('');
+    setMessageLikeCounts({});
+    setUserMessageLikes({});
     fetchConversations(); // Refresh the conversations list
   };
 
@@ -488,73 +577,113 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                       
                       {/* Messages for this date */}
                       <div className="space-y-3">
-                        {dayMessages.map((message) => (
-                          <div
-                            key={message.id}
-                            className={`flex items-start space-x-3 ${message.username === currentUser ? 'justify-end' : 'justify-start'}`}
-                          >
-                            {/* Profile picture for other users' messages */}
-                            {message.username !== currentUser && (
-                              <div className="flex-shrink-0">
-                                {isGuestUser(message.username) ? (
-                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                    <User className="w-4 h-4 text-white" />
-                                  </div>
-                                ) : (
-                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
-                                    {profilePictureCache[message.username] ? (
-                                      <img
-                                        src={profilePictureCache[message.username]!}
-                                        alt={`${message.username}'s profile`}
-                                        className="w-full h-full object-cover rounded-full"
-                                      />
-                                    ) : (
-                                      <User className="w-4 h-4 text-white" />
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                        {dayMessages.map((message) => {
+                          const isCurrentUser = message.username === currentUser;
+                          const messageLikeCount = messageLikeCounts[message.id] || 0;
+                          const userHasLiked = userMessageLikes[message.id] || false;
+                          const isTogglingThisMessage = togglingLike === message.id;
 
+                          return (
                             <div
-                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                                message.username === currentUser
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-gray-700 text-gray-200'
-                              }`}
+                              key={message.id}
+                              className={`flex items-start space-x-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                             >
-                              <p className="text-sm">{message.message}</p>
-                              <p className={`text-xs mt-1 ${
-                                message.username === currentUser ? 'text-blue-200' : 'text-gray-400'
-                              }`}>
-                                {formatTime(message.created_at)}
-                              </p>
-                            </div>
-
-                            {/* Profile picture for current user's messages */}
-                            {message.username === currentUser && (
-                              <div className="flex-shrink-0">
-                                {isGuestUser(currentUser) ? (
-                                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                                    <User className="w-4 h-4 text-white" />
-                                  </div>
-                                ) : (
-                                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center overflow-hidden">
-                                    {profilePictureCache[currentUser] ? (
-                                      <img
-                                        src={profilePictureCache[currentUser]!}
-                                        alt="Your profile"
-                                        className="w-full h-full object-cover rounded-full"
-                                      />
-                                    ) : (
+                              {/* Profile picture for other users' messages */}
+                              {!isCurrentUser && (
+                                <div className="flex-shrink-0">
+                                  {isGuestUser(message.username) ? (
+                                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                                       <User className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                                      {profilePictureCache[message.username] ? (
+                                        <img
+                                          src={profilePictureCache[message.username]!}
+                                          alt={`${message.username}'s profile`}
+                                          className="w-full h-full object-cover rounded-full"
+                                        />
+                                      ) : (
+                                        <User className="w-4 h-4 text-white" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <div
+                                className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                                  isCurrentUser
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-700 text-gray-200'
+                                }`}
+                              >
+                                <p className="text-sm">{message.message}</p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className={`text-xs ${
+                                    isCurrentUser ? 'text-blue-200' : 'text-gray-400'
+                                  }`}>
+                                    {formatTime(message.created_at)}
+                                  </p>
+                                  
+                                  {/* Like section */}
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    {messageLikeCount > 0 && (
+                                      <span className={`text-xs ${
+                                        isCurrentUser ? 'text-blue-200' : 'text-gray-400'
+                                      }`}>
+                                        {messageLikeCount}
+                                      </span>
                                     )}
+                                    <button
+                                      onClick={() => handleToggleMessageLike(message.id)}
+                                      disabled={isTogglingThisMessage}
+                                      className={`p-1 rounded-full transition-all duration-200 hover:scale-110 ${
+                                        userHasLiked
+                                          ? 'text-red-400 hover:text-red-300'
+                                          : isCurrentUser
+                                            ? 'text-blue-200 hover:text-red-300'
+                                            : 'text-gray-400 hover:text-red-300'
+                                      } ${isTogglingThisMessage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                      title={userHasLiked ? 'Unlike message' : 'Like message'}
+                                    >
+                                      {isTogglingThisMessage ? (
+                                        <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
+                                      ) : (
+                                        <Heart
+                                          className={`w-3 h-3 ${userHasLiked ? 'fill-current' : ''}`}
+                                        />
+                                      )}
+                                    </button>
                                   </div>
-                                )}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        ))}
+
+                              {/* Profile picture for current user's messages */}
+                              {isCurrentUser && (
+                                <div className="flex-shrink-0">
+                                  {isGuestUser(currentUser) ? (
+                                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                                      <User className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center overflow-hidden">
+                                      {profilePictureCache[currentUser] ? (
+                                        <img
+                                          src={profilePictureCache[currentUser]!}
+                                          alt="Your profile"
+                                          className="w-full h-full object-cover rounded-full"
+                                        />
+                                      ) : (
+                                        <User className="w-4 h-4 text-white" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))
