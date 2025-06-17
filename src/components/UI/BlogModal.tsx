@@ -725,4 +725,317 @@ const BlogModal: React.FC<BlogModalProps> = ({
                     onClick={() => setIsCreatePostOpen(true)}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
                   >
-                    <Plus className="w
+                    <Plus className="w-4 h-4" />
+                    <span>Write Post</span>
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 icon-shadow-white-sm" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search posts..."
+                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                />
+              </div>
+
+              {/* Sort */}
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-gray-400" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'most-liked')}
+                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="most-liked">Most Liked</option>
+                </select>
+              </div>
+
+              {/* Filter */}
+              {isAuthenticated && (
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-5 h-5 text-gray-400" />
+                  <select
+                    value={filterBy}
+                    onChange={(e) => setFilterBy(e.target.value as 'all' | 'my-posts')}
+                    className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200"
+                  >
+                    <option value="all">All Posts</option>
+                    <option value="my-posts">My Posts</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Posts Grid */}
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : filteredAndSortedPosts.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">
+                  {searchTerm ? 'No posts found' : filterBy === 'my-posts' ? 'No posts created yet' : 'No blog posts yet'}
+                </p>
+                <p className="text-sm">
+                  {searchTerm 
+                    ? 'Try adjusting your search terms' 
+                    : filterBy === 'my-posts'
+                      ? 'Create your first blog post!'
+                      : isAuthenticated 
+                        ? 'Be the first to write a blog post!' 
+                        : 'Sign in to start writing blog posts'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredAndSortedPosts.map((post) => {
+                  const authorProfilePicture = profilePictureCache[post.author_username];
+                  const postLikeCount = blogPostLikeCounts[post.id] || 0;
+                  const userHasLiked = userBlogPostLikes[post.id] || false;
+
+                  return (
+                    <div
+                      key={post.id}
+                      className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-200 group cursor-pointer ${
+                        post.is_editor_choice ? 'editor-choice-border' : ''
+                      }`}
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      {/* Editor's Choice Badge */}
+                      {post.is_editor_choice && (
+                        <div className="relative">
+                          <div className="absolute top-2 right-2 z-10">
+                            <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
+                              <Cross className="w-1.5 h-1.5" />
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-6">
+                        {/* Post Header */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            {isGuestUser(post.author_username) ? (
+                              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-white" />
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(post.author_username);
+                                }}
+                                className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform overflow-hidden"
+                              >
+                                {authorProfilePicture ? (
+                                  <img
+                                    src={authorProfilePicture}
+                                    alt={`${post.author_username}'s profile`}
+                                    className="w-full h-full object-cover rounded-full"
+                                  />
+                                ) : (
+                                  <User className="w-3 h-3 text-white" />
+                                )}
+                              </button>
+                            )}
+                            {isGuestUser(post.author_username) ? (
+                              <span className="text-sm text-gray-400">Guest {post.author_username}</span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserProfileClick(post.author_username);
+                                }}
+                                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+                              >
+                                {post.author_username}
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(post.created_at)}</span>
+                            </div>
+                            {/* Admin Editor's Choice Toggle */}
+                            {isAdminUser && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleEditorChoice(post.id, !!post.is_editor_choice);
+                                  }}
+                                  disabled={togglingEditorChoice === post.id}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    post.is_editor_choice
+                                      ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20'
+                                      : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-900/20'
+                                  }`}
+                                  title={post.is_editor_choice ? "Remove from Editor's Choice" : "Set as Editor's Choice"}
+                                >
+                                  {togglingEditorChoice === post.id ? (
+                                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Cross className={`w-3 h-3 ${post.is_editor_choice ? 'fill-current' : ''}`} />
+                                    <Cross className={`w-1.5 h-1.5 ${post.is_editor_choice ? 'fill-current' : ''}`} />
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                            {(canEditPost(post) || canDeletePost(post)) && (
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {canEditPost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditPost(post);
+                                    }}
+                                    className="p-1 hover:bg-blue-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                                  >
+                                    <Edit className="w-3 h-3 text-blue-400 hover:text-white" />
+                                  </button>
+                                )}
+                                {canDeletePost(post) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePost(post.id);
+                                    }}
+                                    className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                                    title={isAdminUser && post.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-lg font-semibold text-gray-200 mb-3 line-clamp-2 group-hover:text-gray-100 transition-colors">
+                          {post.title}
+                        </h3>
+
+                        {/* Excerpt */}
+                        <p className="text-sm text-gray-300 line-clamp-3 mb-4">
+                          {post.excerpt || truncateContent(post.content)}
+                        </p>
+
+                        {/* Post Stats */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Heart className="w-3 h-3" />
+                              <span>{postLikeCount}</span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Eye className="w-3 h-3" />
+                              <span>{post.view_count}</span>
+                            </div>
+                            {!post.is_published && (
+                              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded-full">
+                                Draft
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {/* Like Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleLike(post.id);
+                              }}
+                              disabled={togglingLike === post.id}
+                              className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-all duration-200 ${
+                                userHasLiked
+                                  ? 'bg-red-600/20 border border-red-500/50 text-red-300'
+                                  : 'bg-gray-700 border border-gray-600 text-gray-400 hover:bg-gray-600 hover:text-red-300'
+                              } ${togglingLike === post.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {togglingLike === post.id ? (
+                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <Heart
+                                  className={`w-3 h-3 ${userHasLiked ? 'fill-current' : ''}`}
+                                />
+                              )}
+                            </button>
+                            <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">
+                              Read more →
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-700 p-4 bg-gray-900">
+            <div className="text-center text-sm text-gray-400">
+              Showing {filteredAndSortedPosts.length} of {posts.length} posts
+              {filterBy === 'my-posts' && (
+                <span className="ml-2 text-blue-400">• Your posts</span>
+              )}
+              {sortBy === 'most-liked' && (
+                <span className="ml-2 text-red-400">• Sorted by most liked</span>
+              )}
+              {isAdminUser && (
+                <span className="ml-2 text-yellow-400">• Admin: Click ✞ to set Editor's Choice</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Blog Post Modal */}
+      <CreateBlogPostModal
+        isOpen={isCreatePostOpen}
+        onClose={() => {
+          setIsCreatePostOpen(false);
+          setPostToEdit(null);
+        }}
+        onSuccess={() => {
+          setIsCreatePostOpen(false);
+          setPostToEdit(null);
+          fetchPosts();
+        }}
+        currentUser={currentUser}
+        isAuthenticated={isAuthenticated}
+        initialPost={postToEdit}
+      />
+    </>
+  );
+};
+
+export default BlogModal;
+
+export default BlogModal
