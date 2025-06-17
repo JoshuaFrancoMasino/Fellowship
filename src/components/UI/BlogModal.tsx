@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart, ArrowLeft, MessageCircle, Send } from 'lucide-react';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Cross, Heart, ArrowLeft, MessageCircle, Send } from 'lucide-react';
 import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
@@ -826,9 +826,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
                       {/* Editor's Choice Badge */}
                       {post.is_editor_choice && (
                         <div className="relative">
-                          <div className="absolute top-2 left-2 z-10">
+                          <div className="absolute top-2 left-3 z-10">
                             <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
-                              <Star className="w-3 h-3" />
+                              <Cross className="w-3 h-3" />
                             </span>
                           </div>
                         </div>
@@ -899,7 +899,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
                                   {togglingEditorChoice === post.id ? (
                                     <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                                   ) : (
-                                    <Star className={`w-3 h-3 ${post.is_editor_choice ? 'fill-current' : ''}`} />
+                                    <Cross className={`w-3 h-3 ${post.is_editor_choice ? 'fill-current' : ''}`} />
                                   )}
                                 </button>
                               </div>
@@ -1008,7 +1008,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
                 <span className="ml-2 text-red-400">• Sorted by most liked</span>
               )}
               {isAdminUser && (
-                <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
+                <span className="ml-2 text-yellow-400">• Admin: Click ✞ to set Editor's Choice</span>
               )}
             </div>
           </div>

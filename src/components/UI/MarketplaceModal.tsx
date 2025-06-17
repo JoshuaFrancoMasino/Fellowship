@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2, Star } from 'lucide-react';
+import { X, ShoppingBag, Search, Plus, DollarSign, MessageCircle, User, Calendar, Filter, Edit, Trash2, Cross } from 'lucide-react';
 import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrentUserProfile, getProfileByUsername, updateMarketplaceItem } from '../../lib/supabase';
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
@@ -371,9 +371,9 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                       {/* Editor's Choice Badge */}
                       {item.is_editor_choice && (
                         <div className="relative">
-                          <div className="absolute top-2 left-2 z-10">
+                          <div className="absolute top-2 left-3 z-10">
                             <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
-                              <Star className="w-3 h-3" />
+                              <Cross className="w-3 h-3" />
                             </span>
                           </div>
                         </div>
@@ -484,7 +484,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                                   {togglingEditorChoice === item.id ? (
                                     <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                                   ) : (
-                                    <Star className={`w-3 h-3 ${item.is_editor_choice ? 'fill-current' : ''}`} />
+                                    <Cross className={`w-3 h-3 ${item.is_editor_choice ? 'fill-current' : ''}`} />
                                   )}
                                 </button>
                               </div>
@@ -629,7 +629,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                 <span className="ml-2 text-blue-400">• Sign in to sell items</span>
               )}
               {isAdminUser && (
-                <span className="ml-2 text-yellow-400">• Admin: Click ⭐ to set Editor's Choice</span>
+                <span className="ml-2 text-yellow-400">• Admin: Click ✞ to set Editor's Choice</span>
               )}
             </div>
           </div>
