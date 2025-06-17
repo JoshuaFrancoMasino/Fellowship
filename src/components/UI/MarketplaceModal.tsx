@@ -388,7 +388,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                           />
                           {item.images.length > 1 && (
-                            <div className="absolute top-2 right-2 bg-gray-800/70 text-gray-200 px-2 py-1 rounded-full text-xs">
+                            <div className="absolute bottom-2 right-2 bg-gray-800/70 text-gray-200 px-2 py-1 rounded-full text-xs">
                               +{item.images.length - 1} more
                             </div>
                           )}
