@@ -373,7 +373,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                         <div className="relative">
                           <div className="absolute top-2 right-2 z-10">
                             <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
-                              <Cross className="w-3 h-3" />
+                              <Cross className="w-1.5 h-1.5" />
                             </span>
                           </div>
                         </div>
@@ -485,6 +485,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                                     <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                                   ) : (
                                     <Cross className={`w-3 h-3 ${item.is_editor_choice ? 'fill-current' : ''}`} />
+                                    <Cross className={`w-1.5 h-1.5 ${item.is_editor_choice ? 'fill-current' : ''}`} />
                                   )}
                                 </button>
                               </div>
