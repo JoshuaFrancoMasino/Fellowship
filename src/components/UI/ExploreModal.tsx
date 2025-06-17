@@ -527,7 +527,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                       <div className="relative">
                         <div className="absolute top-2 right-2 z-10">
                           <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
-                            <Cross className="w-1.5 h-1.5" />
+                            <Cross className="w-3 h-3" />
                           </span>
                         </div>
                       </div>
@@ -630,7 +630,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                               {togglingEditorChoice === pin.id ? (
                                 <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                               ) : (
-                                <Cross className={`w-1.5 h-1.5 ${pin.is_editor_choice ? 'fill-current' : ''}`} />
+                                <Cross className={`w-3 h-3 ${pin.is_editor_choice ? 'fill-current' : ''}`} />
                               )}
                             </button>
                           </div>
@@ -697,4 +697,11 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
             )}
           </div>
         </div>
-      
+      </div>
+    </div>
+  );
+};
+
+export default ExploreModal;
+
+export default ExploreModal
