@@ -699,9 +699,3 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
         </div>
       </div>
     </div>
-  );
-};
-
-export default ExploreModal;
-
-export default ExploreModal
