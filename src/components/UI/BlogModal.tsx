@@ -1037,7 +1037,3 @@ const BlogModal: React.FC<BlogModalProps> = ({
 };
 
 export default BlogModal;
-
-export default BlogModal
-
-export default BlogModal
