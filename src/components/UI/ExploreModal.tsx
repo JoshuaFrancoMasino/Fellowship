@@ -528,7 +528,6 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                         <div className="absolute top-2 left-2 z-10">
                           <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
                             <Star className="w-3 h-3" />
-                            <span>Editor's Choice</span>
                           </span>
                         </div>
                       </div>
