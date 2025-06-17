@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart, ArrowLeft } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes } from '../../lib/supabase';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Star, Heart, ArrowLeft, MessageCircle, Send } from 'lucide-react';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
 interface BlogModalProps {
@@ -35,6 +35,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [userBlogPostLikes, setUserBlogPostLikes] = useState<{ [key: string]: boolean }>({});
   const [togglingLike, setTogglingLike] = useState<string | null>(null);
 
+  // Comment-related state
+  const [comments, setComments] = useState<BlogPostComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [deletingComment, setDeletingComment] = useState<string | null>(null);
+
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
 
@@ -60,6 +67,16 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
   }, [posts, currentUser]);
 
+  // Fetch comments when a post is selected
+  useEffect(() => {
+    if (selectedPost) {
+      fetchComments();
+    } else {
+      setComments([]);
+      setNewComment('');
+    }
+  }, [selectedPost]);
+
   const fetchProfilePictures = async () => {
     const usernames = [...new Set(posts.map(post => post.author_username))];
     const cache: { [key: string]: string | null } = {};
@@ -80,6 +97,85 @@ const BlogModal: React.FC<BlogModalProps> = ({
     }
 
     setProfilePictureCache(cache);
+  };
+
+  const fetchComments = async () => {
+    if (!selectedPost) return;
+
+    setLoadingComments(true);
+    try {
+      const blogComments = await getBlogPostComments(selectedPost.id);
+      setComments(blogComments);
+
+      // Fetch profile pictures for comment authors
+      const commentUsernames = [...new Set(blogComments.map(comment => comment.username))];
+      const commentCache: { [key: string]: string | null } = { ...profilePictureCache };
+
+      for (const username of commentUsernames) {
+        if (!isGuestUser(username) && !(username in commentCache)) {
+          try {
+            const profile = await getProfileByUsername(username);
+            commentCache[username] = profile?.profile_picture_url || null;
+          } catch (error) {
+            console.error(`Error fetching profile picture for ${username}:`, error);
+            commentCache[username] = null;
+          }
+        } else if (isGuestUser(username) && !(username in commentCache)) {
+          commentCache[username] = null;
+        }
+      }
+
+      setProfilePictureCache(commentCache);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() || !selectedPost || !currentUser) return;
+
+    setSubmittingComment(true);
+    try {
+      const success = await createBlogPostComment(selectedPost.id, currentUser, newComment.trim());
+      
+      if (success) {
+        setNewComment('');
+        await fetchComments(); // Refresh comments
+      } else {
+        alert('Failed to post comment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      alert('Failed to post comment. Please try again.');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+
+    setDeletingComment(commentId);
+    try {
+      const success = await deleteBlogPostComment(commentId);
+      
+      if (success) {
+        await fetchComments(); // Refresh comments
+      } else {
+        alert('Failed to delete comment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment. Please try again.');
+    } finally {
+      setDeletingComment(null);
+    }
+  };
+
+  const canDeleteComment = (comment: BlogPostComment) => {
+    return comment.username === currentUser || isAdminUser;
   };
 
   const fetchBlogPostLikeCounts = async () => {
@@ -265,6 +361,15 @@ const BlogModal: React.FC<BlogModalProps> = ({
     });
   };
 
+  const formatCommentDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const truncateContent = (content: string, maxLength: number = 150) => {
     // Strip HTML tags for preview
     const textContent = content.replace(/<[^>]*>/g, '');
@@ -382,57 +487,213 @@ const BlogModal: React.FC<BlogModalProps> = ({
             </div>
           </div>
 
-          {/* Post Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-            <div className="prose prose-invert max-w-none">
-              <div 
-                className="text-gray-200 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: selectedPost.content }}
-              />
+          {/* Post Content and Comments */}
+          <div className="flex-1 overflow-y-auto max-h-[calc(90vh-120px)]">
+            {/* Post Content */}
+            <div className="p-6 border-b border-gray-700">
+              <div className="prose prose-invert max-w-none">
+                <div 
+                  className="text-gray-200 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: selectedPost.content }}
+                />
+              </div>
+              
+              {/* Post Stats */}
+              <div className="mt-8 pt-6 border-t border-gray-700">
+                <div className="flex items-center justify-between text-sm text-gray-400">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1">
+                      <Heart className="w-4 h-4" />
+                      <span>{postLikeCount} likes</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <MessageCircle className="w-4 h-4" />
+                      <span>{comments.length} comments</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Eye className="w-4 h-4" />
+                      <span>{selectedPost.view_count} views</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Published {formatDate(selectedPost.created_at)}</span>
+                    </div>
+                  </div>
+                  {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
+                    <div className="flex items-center space-x-2">
+                      {canEditPost(selectedPost) && (
+                        <button
+                          onClick={() => handleEditPost(selectedPost)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          title={isAdminUser && selectedPost.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      {canDeletePost(selectedPost) && (
+                        <button
+                          onClick={() => handleDeletePost(selectedPost.id)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                          title={isAdminUser && selectedPost.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            
-            {/* Post Stats */}
-            <div className="mt-8 pt-6 border-t border-gray-700">
-              <div className="flex items-center justify-between text-sm text-gray-400">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-1">
-                    <Heart className="w-4 h-4" />
-                    <span>{postLikeCount} likes</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Eye className="w-4 h-4" />
-                    <span>{selectedPost.view_count} views</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>Published {formatDate(selectedPost.created_at)}</span>
+
+            {/* Comments Section */}
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-200 flex items-center space-x-2">
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Comments ({comments.length})</span>
+                </h3>
+              </div>
+
+              {/* Add Comment Form */}
+              {currentUser && (
+                <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    {/* Current User Avatar */}
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {profilePictureCache[currentUser] ? (
+                        <img
+                          src={profilePictureCache[currentUser]!}
+                          alt="Your profile"
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <User className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write a comment..."
+                        maxLength={1000}
+                        rows={3}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 resize-none"
+                      />
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="text-xs text-gray-400">
+                          {newComment.length}/1000 characters
+                        </div>
+                        <button
+                          onClick={handleSubmitComment}
+                          disabled={!newComment.trim() || submittingComment}
+                          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                        >
+                          {submittingComment ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          <span>{submittingComment ? 'Posting...' : 'Post Comment'}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
-                  <div className="flex items-center space-x-2">
-                    {canEditPost(selectedPost) && (
-                      <button
-                        onClick={() => handleEditPost(selectedPost)}
-                        className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        title={isAdminUser && selectedPost.author_username !== currentUser ? "Edit post (Admin)" : "Edit your post"}
-                      >
-                        <Edit className="w-3 h-3" />
-                        <span>Edit</span>
-                      </button>
-                    )}
-                    {canDeletePost(selectedPost) && (
-                      <button
-                        onClick={() => handleDeletePost(selectedPost.id)}
-                        className="flex items-center space-x-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                        title={isAdminUser && selectedPost.author_username !== currentUser ? "Delete post (Admin)" : "Delete your post"}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
+
+              {/* Comments List */}
+              {loadingComments ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-gray-400">Loading comments...</p>
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No comments yet</p>
+                  <p className="text-sm">Be the first to share your thoughts!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {comments.map((comment) => {
+                    const commentProfilePicture = profilePictureCache[comment.username];
+                    const canDelete = canDeleteComment(comment);
+                    const isDeleting = deletingComment === comment.id;
+
+                    return (
+                      <div key={comment.id} className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          {/* Commenter Avatar */}
+                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {isGuestUser(comment.username) ? (
+                              <User className="w-4 h-4 text-white" />
+                            ) : (
+                              <>
+                                {commentProfilePicture ? (
+                                  <img
+                                    src={commentProfilePicture}
+                                    alt={`${comment.username}'s profile`}
+                                    className="w-full h-full object-cover rounded-full"
+                                  />
+                                ) : (
+                                  <User className="w-4 h-4 text-white" />
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            {/* Comment Header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                {isGuestUser(comment.username) ? (
+                                  <span className="font-medium text-gray-200">
+                                    Guest {comment.username}
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUserProfileClick(comment.username)}
+                                    className="font-medium text-gray-200 hover:text-blue-400 transition-colors"
+                                  >
+                                    {comment.username}
+                                  </button>
+                                )}
+                                <span className="text-xs text-gray-400">
+                                  {formatCommentDate(comment.created_at)}
+                                </span>
+                              </div>
+
+                              {/* Delete Button */}
+                              {canDelete && (
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  disabled={isDeleting}
+                                  className="p-1 hover:bg-red-600 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                  title={isAdminUser && comment.username !== currentUser ? "Delete comment (Admin)" : "Delete your comment"}
+                                >
+                                  {isDeleting ? (
+                                    <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Comment Text */}
+                            <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                              {comment.text}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

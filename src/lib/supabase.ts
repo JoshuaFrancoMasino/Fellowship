@@ -122,6 +122,14 @@ export type BlogPostLike = {
   created_at: string;
 };
 
+export type BlogPostComment = {
+  id: string;
+  blog_post_id: string;
+  username: string;
+  text: string;
+  created_at: string;
+};
+
 export const getCurrentUserProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
   
@@ -793,6 +801,80 @@ export const getUserBlogPostLikes = async (blogPostIds: string[], username: stri
   } catch (err) {
     console.error('Failed to fetch user blog post likes:', err);
     return {};
+  }
+};
+
+// Blog post comment functions
+export const getBlogPostComments = async (blogPostId: string): Promise<BlogPostComment[]> => {
+  if (!supabase) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('blog_post_comments')
+      .select('*')
+      .eq('blog_post_id', blogPostId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching blog post comments:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch blog post comments:', err);
+    return [];
+  }
+};
+
+export const createBlogPostComment = async (
+  blogPostId: string,
+  username: string,
+  text: string
+): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('blog_post_comments')
+      .insert([
+        {
+          blog_post_id: blogPostId,
+          username: username.trim(),
+          text: text.trim(),
+        }
+      ]);
+
+    if (error) {
+      console.error('Error creating blog post comment:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to create blog post comment:', err);
+    return false;
+  }
+};
+
+export const deleteBlogPostComment = async (commentId: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('blog_post_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) {
+      console.error('Error deleting blog post comment:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to delete blog post comment:', err);
+    return false;
   }
 };
 
