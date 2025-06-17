@@ -525,7 +525,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                     {/* Editor's Choice Badge */}
                     {pin.is_editor_choice && (
                       <div className="relative">
-                        <div className="absolute top-2 left-3 z-10">
+                        <div className="absolute top-2 right-2 z-10">
                           <span className="editor-choice-badge px-2 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
                             <Cross className="w-3 h-3" />
                           </span>
