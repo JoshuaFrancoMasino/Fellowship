@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Bell, BellOff, Check, CheckCheck, Trash2, User, Clock, MapPin, BookOpen, ShoppingBag, MessageCircle } from 'lucide-react';
 import { 
   Notification, 
@@ -42,17 +42,17 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const channelRef = useRef<any>(null);
+  const deletedNotificationsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    let subscription: any = null;
-    
     if (isOpen && isAuthenticated) {
       // Wrap async calls in try-catch to prevent crashes
       const initializeModal = async () => {
         try {
           await fetchNotifications();
           await fetchUnreadCount();
-          subscription = setupRealtimeSubscription();
+          setupRealtimeSubscription();
         } catch (error) {
           console.error('Error initializing notifications modal:', error);
           showError('Connection Error', 'Unable to load notifications. Please check your connection.');
@@ -63,9 +63,14 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
 
     return () => {
-      // Cleanup subscription on unmount or when modal closes
-      if (subscription && typeof subscription.unsubscribe === 'function') {
-        subscription.unsubscribe();
+      // Cleanup channel on unmount or when modal closes
+      if (channelRef.current) {
+        try {
+          supabase?.removeChannel(channelRef.current);
+          channelRef.current = null;
+        } catch (error) {
+          console.error('Error cleaning up channel:', error);
+        }
       }
     };
   }, [isOpen, isAuthenticated, currentUser]);
@@ -90,9 +95,20 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   const setupRealtimeSubscription = () => {
     if (!supabase || !isAuthenticated) return null;
 
+    // Clean up existing channel if any
+    if (channelRef.current) {
+      try {
+        supabase.removeChannel(channelRef.current);
+      } catch (error) {
+        console.error('Error removing existing channel:', error);
+      }
+    }
+
     try {
-      const subscription = supabase
-        .channel('notifications')
+      // Create a unique channel name to avoid conflicts
+      const channelName = `notifications_${currentUser}_${Date.now()}`;
+      const channel = supabase
+        .channel(channelName)
         .on('postgres_changes', 
           { 
             event: '*', 
@@ -102,17 +118,35 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           },
           (payload) => {
             // Always refetch data for any change to ensure consistency
-            fetchNotifications().catch(error => {
-              console.error('Error refetching notifications in subscription:', error);
-            });
-            fetchUnreadCount().catch(error => {
-              console.error('Error refetching unread count in subscription:', error);
-            });
+            // Only refetch if this isn't a local deletion we just made
+            const eventType = payload.eventType;
+            const notificationId = payload.new?.id || payload.old?.id;
+            
+            if (eventType === 'DELETE' && deletedNotificationsRef.current.has(notificationId)) {
+              // This was a local deletion, remove from tracking set but don't refetch
+              deletedNotificationsRef.current.delete(notificationId);
+            } else {
+              // This is a real change from elsewhere, refetch data
+              fetchNotifications().catch(error => {
+                console.error('Error refetching notifications in subscription:', error);
+              });
+              fetchUnreadCount().catch(error => {
+                console.error('Error refetching unread count in subscription:', error);
+              });
+            }
           }
-        )
-        .subscribe();
+        );
 
-      return subscription;
+      channelRef.current = channel;
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Notifications subscription established');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Notifications subscription error');
+        }
+      });
+
+      return channel;
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);
       return null;
@@ -191,6 +225,9 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   };
 
   const handleDeleteNotification = async (notificationId: string) => {
+    // Track this deletion to prevent refetch overriding local state
+    deletedNotificationsRef.current.add(notificationId);
+    
     // Optimistically remove from UI first
     const previousNotifications = notifications;
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -202,11 +239,15 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         onNotificationAction(); // Refresh notification counts
         showSuccess('Deleted', 'Notification removed');
       } else {
+        // Remove from tracking set on failure
+        deletedNotificationsRef.current.delete(notificationId);
         // Revert optimistic update
         setNotifications(previousNotifications);
         showError('Delete Failed', 'Could not delete notification. Please check your connection.');
       }
     } catch (error) {
+      // Remove from tracking set on error
+      deletedNotificationsRef.current.delete(notificationId);
       // Revert optimistic update
       setNotifications(previousNotifications);
       logError('Error deleting notification', error instanceof Error ? error : new Error(String(error)));
