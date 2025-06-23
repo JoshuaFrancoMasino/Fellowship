@@ -269,7 +269,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="glass-header p-6 text-white">
+          <div className="glass-header p-3 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 glass-white rounded-full flex items-center justify-center">
@@ -286,7 +286,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                 {isAuthenticated && (
                   <button
                     onClick={() => setIsCreateListingOpen(true)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                    className="px-4 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Sell Item</span>
@@ -303,7 +303,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
           </div>
 
           {/* Search and Filter Bar */}
-          <div className="p-6 border-b border-gray-700">
+          <div className="p-3 border-b border-gray-700">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
               <div className="flex-1 relative">
@@ -313,7 +313,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search items, descriptions, or sellers..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
                 />
               </div>
 
@@ -323,7 +323,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200"
+                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-200"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
