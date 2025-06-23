@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createNotification } from './supabase';
 
 export interface ChatMessage {
   id: string;
@@ -105,7 +106,7 @@ class ChatService {
       // Create a unique pin_id for the conversation between two users
       const conversationId = this.getConversationId(this.currentUser, recipientUsername);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .insert([
           {
@@ -115,22 +116,45 @@ class ChatService {
             media_url: mediaUrl || null,
           }
         ]);
+        .select('id')
+        .single();
 
       if (error) {
         console.error('❌ Error sending message:', error);
         return false;
       }
 
+      // Create notification for the recipient
+      if (data?.id) {
+        try {
+          await createNotification(
+            recipientUsername,
+            this.currentUser,
+            'message',
+            'chat_message',
+            data.id,
+            `${this.currentUser} sent you a message`
+          );
+        } catch (notificationError) {
+          console.error('❌ Error creating message notification:', notificationError);
+          // Don't fail the message sending if notification fails
+        }
+      }
+
       // Create notification for marketplace item inquiry if applicable
       if (entityType === 'marketplace_item' && entityId) {
-        await createNotification(
-          recipientUsername,
-          this.currentUser,
-          'message',
-          'marketplace_item',
-          entityId,
-          `${this.currentUser} sent you a message about your marketplace listing`
-        );
+        try {
+          await createNotification(
+            recipientUsername,
+            this.currentUser,
+            'message',
+            'marketplace_item',
+            entityId,
+            `${this.currentUser} sent you a message about your marketplace listing`
+          );
+        } catch (notificationError) {
+          console.error('❌ Error creating marketplace notification:', notificationError);
+        }
       }
 
       console.log('✅ Message sent successfully');

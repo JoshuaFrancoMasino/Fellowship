@@ -21,6 +21,7 @@ interface NotificationsModalProps {
   onSelectPin: (pinId: string) => void;
   onSelectBlogPost: (blogPostId: string) => void;
   onSelectMarketplaceItem: (itemId: string) => void;
+  onSelectChatMessage: (messageId: string) => void;
 }
 
 const NotificationsModal: React.FC<NotificationsModalProps> = ({
@@ -32,6 +33,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   onSelectPin,
   onSelectBlogPost,
   onSelectMarketplaceItem,
+  onSelectChatMessage,
 }) => {
   const { showError, showSuccess } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -167,6 +169,9 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       case 'marketplace_item':
         onSelectMarketplaceItem(notification.entity_id);
         break;
+      case 'chat_message':
+        onSelectChatMessage(notification.entity_id);
+        break;
     }
 
     onClose();
@@ -185,6 +190,8 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         return <BookOpen className="w-4 h-4 text-purple-400" />;
       case 'marketplace_item':
         return <ShoppingBag className="w-4 h-4 text-green-400" />;
+      case 'chat_message':
+        return <MessageCircle className="w-4 h-4 text-blue-400" />;
       default:
         return <Bell className="w-4 h-4 text-gray-400" />;
     }

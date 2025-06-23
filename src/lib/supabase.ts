@@ -138,7 +138,7 @@ export type Notification = {
   recipient_username: string;
   sender_username: string;
   type: 'like' | 'comment' | 'message';
-  entity_type: 'pin' | 'blog_post' | 'marketplace_item';
+  entity_type: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message';
   entity_id: string;
   message: string;
   is_read: boolean;
@@ -962,7 +962,7 @@ export const createNotification = async (
   recipientUsername: string,
   senderUsername: string,
   type: 'like' | 'comment' | 'message',
-  entityType: 'pin' | 'blog_post' | 'marketplace_item',
+  entityType: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message',
   entityId: string,
   message: string
 ): Promise<boolean> => {
