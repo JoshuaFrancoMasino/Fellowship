@@ -47,14 +47,24 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
     let subscription: any = null;
     
     if (isOpen && isAuthenticated) {
-      fetchNotifications();
-      fetchUnreadCount();
-      subscription = setupRealtimeSubscription();
+      // Wrap async calls in try-catch to prevent crashes
+      const initializeModal = async () => {
+        try {
+          await fetchNotifications();
+          await fetchUnreadCount();
+          subscription = setupRealtimeSubscription();
+        } catch (error) {
+          console.error('Error initializing notifications modal:', error);
+          showError('Connection Error', 'Unable to load notifications. Please check your connection.');
+        }
+      };
+      
+      initializeModal();
     }
 
     return () => {
       // Cleanup subscription on unmount or when modal closes
-      if (subscription) {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
         subscription.unsubscribe();
       }
     };
@@ -63,34 +73,58 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   // Separate effect for filter changes to avoid recreating subscription
   useEffect(() => {
     if (isOpen && isAuthenticated) {
-      fetchNotifications();
+      // Wrap in try-catch to prevent crashes
+      const loadFilteredNotifications = async () => {
+        try {
+          await fetchNotifications();
+        } catch (error) {
+          console.error('Error loading filtered notifications:', error);
+          showError('Load Error', 'Unable to filter notifications. Please try again.');
+        }
+      };
+      
+      loadFilteredNotifications();
     }
   }, [filter]);
 
   const setupRealtimeSubscription = () => {
-    if (!supabase || !isAuthenticated) return;
+    if (!supabase || !isAuthenticated) return null;
 
-    const subscription = supabase
-      .channel('notifications')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'notifications',
-          filter: `recipient_username=eq.${currentUser}`
-        },
-        (payload) => {
-          // Always refetch data for any change to ensure consistency
-          fetchNotifications();
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
+    try {
+      const subscription = supabase
+        .channel('notifications')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'notifications',
+            filter: `recipient_username=eq.${currentUser}`
+          },
+          (payload) => {
+            // Always refetch data for any change to ensure consistency
+            fetchNotifications().catch(error => {
+              console.error('Error refetching notifications in subscription:', error);
+            });
+            fetchUnreadCount().catch(error => {
+              console.error('Error refetching unread count in subscription:', error);
+            });
+          }
+        )
+        .subscribe();
 
-    return subscription;
+      return subscription;
+    } catch (error) {
+      console.error('Error setting up realtime subscription:', error);
+      return null;
+    }
   };
 
   const fetchNotifications = async () => {
+    if (!supabase) {
+      console.warn('Supabase client not initialized, skipping notification fetch');
+      return;
+    }
+    
     setLoading(true);
     try {
       const data = await getNotificationsForUser(
@@ -107,6 +141,11 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   };
 
   const fetchUnreadCount = async () => {
+    if (!supabase) {
+      console.warn('Supabase client not initialized, skipping unread count fetch');
+      return;
+    }
+    
     try {
       const count = await getUnreadNotificationCount(currentUser);
       setUnreadCount(count);
