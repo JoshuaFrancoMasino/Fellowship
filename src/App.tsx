@@ -257,6 +257,7 @@ function App() {
       console.error('❌ Supabase client not available for sign out');
       alert('Sign out failed: Supabase client not available');
     }
+  }
 
   const handleSignOutCancel = () => {
     console.log('❌ Sign out cancelled by user');
