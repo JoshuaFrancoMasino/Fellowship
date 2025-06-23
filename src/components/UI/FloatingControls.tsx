@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, MessageSquare, LogIn, LogOut, ShoppingBag, BookOpen } from 'lucide-react';
+import { User, MapPin, MessageSquare, LogIn, LogOut, ShoppingBag, BookOpen, Bell } from 'lucide-react';
 
 interface FloatingControlsProps {
   onOpenUserProfile: () => void;
@@ -9,9 +9,11 @@ interface FloatingControlsProps {
   onOpenBlogModal: () => void;
   onOpenWelcomeModal: () => void;
   onAuthButtonClick: () => void;
+  onOpenNotificationsModal: () => void;
   totalPins: number;
   currentUser: string;
   isAuthenticated: boolean;
+  unreadNotificationCount: number;
 }
 
 const FloatingControls: React.FC<FloatingControlsProps> = ({
@@ -22,9 +24,11 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
   onOpenMarketplaceModal,
   onOpenBlogModal,
   onAuthButtonClick,
+  onOpenNotificationsModal,
   totalPins,
   currentUser,
   isAuthenticated,
+  unreadNotificationCount,
 }) => {
   return (
     <div className="fixed bottom-4 left-4 z-40 space-y-3 pointer-events-none">
@@ -44,6 +48,24 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
           <LogIn className="w-6 h-6 text-green-600 icon-shadow-white-sm" />
         )}
       </button>
+
+      {/* Notifications Button - Only for authenticated users */}
+      {isAuthenticated && (
+        <button
+          onClick={onOpenNotificationsModal}
+          className="w-14 h-14 glass-blue rounded-full shadow-xl flex items-center justify-center hover:bg-yellow-200/30 hover:scale-105 transition-all duration-200 pointer-events-auto relative"
+          title="View notifications"
+        >
+          <Bell className="w-6 h-6 text-yellow-600 icon-shadow-white-sm" />
+          {unreadNotificationCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+              <span className="text-xs text-white font-bold">
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </span>
+            </div>
+          )}
+        </button>
+      )}
 
       {/* User Profile Button */}
       <button

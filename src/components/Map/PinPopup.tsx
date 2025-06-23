@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Trash2, X, User, Edit, Image, Upload } from 'lucide-react';
-import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
+import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile, createNotification } from '../../lib/supabase';
 import { useNotifications } from '../UI/NotificationSystem';
 import { logError } from '../../lib/utils/logger';
 
@@ -218,11 +218,26 @@ const PinPopup: React.FC<PinPopupProps> = ({
   };
 
   const handleLike = async (imageIndex: number) => {
+    const previousUserLikes = userLikes[imageIndex] || false;
+    
     console.log('👆 Like button clicked for image index:', imageIndex);
     console.log('🔍 Current user likes state:', userLikes);
     console.log('🔍 Current like counts:', likes);
     
     await onLike(pin.id, imageIndex);
+    
+    // Create notification for pin owner if this is a new like (not an unlike)
+    if (!previousUserLikes && pin.username !== currentUser) {
+      await createNotification(
+        pin.username,
+        currentUser,
+        'like',
+        'pin',
+        pin.id,
+        `${currentUser} liked your pin`
+      );
+    }
+    
     // Refresh likes after the operation
     setTimeout(() => {
       fetchLikes();

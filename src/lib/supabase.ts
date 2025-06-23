@@ -933,3 +933,134 @@ export const updatePin = async (
     return false;
   }
 };
+
+// Notification functions
+export const createNotification = async (
+  recipientUsername: string,
+  senderUsername: string,
+  type: 'like' | 'comment' | 'message',
+  entityType: 'pin' | 'blog_post' | 'marketplace_item',
+  entityId: string,
+  message: string
+): Promise<boolean> => {
+  if (!supabase || recipientUsername === senderUsername) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .insert([
+        {
+          recipient_username: recipientUsername,
+          sender_username: senderUsername,
+          type,
+          entity_type: entityType,
+          entity_id: entityId,
+          message,
+        }
+      ]);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to create notification:', err);
+    return false;
+  }
+};
+
+export const getNotificationsForUser = async (username: string, isRead?: boolean): Promise<Notification[]> => {
+  if (!supabase) return [];
+  
+  try {
+    let query = supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_username', username)
+      .order('created_at', { ascending: false });
+
+    if (isRead !== undefined) {
+      query = query.eq('is_read', isRead);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch notifications:', err);
+    return [];
+  }
+};
+
+export const getUnreadNotificationCount = async (username: string): Promise<number> => {
+  if (!supabase) return 0;
+  
+  try {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_username', username)
+      .eq('is_read', false);
+
+    if (error) {
+      console.error('Error fetching unread notification count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (err) {
+    console.error('Failed to fetch unread notification count:', err);
+    return 0;
+  }
+};
+
+export const markNotificationAsRead = async (notificationId: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to mark notification as read:', err);
+    return false;
+  }
+};
+
+export const markAllNotificationsAsRead = async (username: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('recipient_username', username)
+      .eq('is_read', false);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to mark all notifications as read:', err);
+    return false;
+  }
+};
+
+export const deleteNotification = async (notificationId: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notificationId);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to delete notification:', err);
+    return false;
+  }
+};

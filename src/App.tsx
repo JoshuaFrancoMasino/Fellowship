@@ -8,9 +8,10 @@ import MarketplaceModal from './components/UI/MarketplaceModal';
 import BlogModal from './components/UI/BlogModal';
 import ChatWindow from './components/UI/ChatWindow';
 import WelcomeModal from './components/UI/WelcomeModal';
+import NotificationsModal from './components/UI/NotificationsModal';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
-import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem } from './lib/supabase';
+import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem, getUnreadNotificationCount } from './lib/supabase';
 import { NotificationProvider, NotificationSystem } from './components/UI/NotificationSystem';
 import { logError } from './lib/utils/logger';
 import { getGuestUsername, setGuestUsername } from './lib/storage';
@@ -25,6 +26,7 @@ function App() {
   const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState(false);
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
   const [isChatWindowOpen, setIsChatWindowOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
   const [showSignOutConfirmation, setShowSignOutConfirmation] = useState(false);
@@ -39,6 +41,7 @@ function App() {
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
   const [selectedMarketplaceItem, setSelectedMarketplaceItem] = useState<MarketplaceItem | null>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   useEffect(() => {
     // Check authentication status
@@ -69,6 +72,9 @@ function App() {
             console.log('📝 Profile fetched for signed in user:', profile.username);
             setCurrentUser(profile.username);
             setIsAdminUser(profile.role === 'admin');
+            
+            // Fetch unread notification count
+            fetchUnreadNotificationCount(profile.username);
           } else {
             console.error('❌ Failed to fetch profile for signed in user');
           }
@@ -76,6 +82,7 @@ function App() {
           console.log('👋 User signed out, resetting state...');
           setIsAuthenticated(false);
           setIsAdminUser(false);
+          setUnreadNotificationCount(0);
           // Reset to guest username
           const guestUsername = getGuestUsername();
           console.log('🔄 Setting current user to guest:', guestUsername);
@@ -129,6 +136,40 @@ function App() {
     };
   }, [isConnected]);
 
+  // Fetch unread notification count
+  const fetchUnreadNotificationCount = async (username: string) => {
+    try {
+      const count = await getUnreadNotificationCount(username);
+      setUnreadNotificationCount(count);
+    } catch (error) {
+      console.error('Error fetching unread notification count:', error);
+    }
+  };
+
+  // Set up real-time notification subscription
+  useEffect(() => {
+    if (isAuthenticated && currentUser && supabase) {
+      const subscription = supabase
+        .channel('notifications')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'notifications',
+            filter: `recipient_username=eq.${currentUser}`
+          },
+          () => {
+            fetchUnreadNotificationCount(currentUser);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [isAuthenticated, currentUser]);
+
   const checkAuthStatus = async () => {
     if (!supabase) return;
     
@@ -141,6 +182,7 @@ function App() {
         if (profile) {
           setCurrentUser(profile.username);
           setIsAdminUser(profile.role === 'admin');
+          fetchUnreadNotificationCount(profile.username);
         }
       }
     } catch (error) {
@@ -206,6 +248,10 @@ function App() {
 
   const handleOpenWelcomeModal = () => {
     setIsWelcomeModalOpen(true);
+  };
+
+  const handleOpenNotificationsModal = () => {
+    setIsNotificationsModalOpen(true);
   };
 
   const handleAuthButtonClick = () => {
@@ -590,11 +636,13 @@ function App() {
         onOpenMarketplaceModal={() => handleOpenMarketplaceModal()}
         onOpenBlogModal={() => handleOpenBlogModal()}
         onOpenChatWindow={() => handleOpenChatWindow()}
+        onOpenNotificationsModal={handleOpenNotificationsModal}
         onOpenWelcomeModal={handleOpenWelcomeModal}
         onAuthButtonClick={handleAuthButtonClick}
         totalPins={pins.length}
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
+        unreadNotificationCount={unreadNotificationCount}
       />
 
       <PinFormModal
@@ -667,6 +715,17 @@ function App() {
         isOpen={showSignOutConfirmation}
         onConfirm={handleSignOutConfirm}
         onCancel={handleSignOutCancel}
+      />
+
+      <NotificationsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        currentUser={currentUser}
+        isAuthenticated={isAuthenticated}
+        onOpenUserProfile={handleOpenUserProfile}
+        onSelectPin={handleSelectPinFromProfile}
+        onSelectBlogPost={handleSelectBlogPostFromProfile}
+        onSelectMarketplaceItem={handleSelectMarketplaceItemFromProfile}
       />
 
       {!isConnected && (
