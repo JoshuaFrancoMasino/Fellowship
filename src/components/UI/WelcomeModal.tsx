@@ -254,20 +254,30 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) => {
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Developer Link */}
-        <div className="px-6 pb-6">
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
-            <a 
-              href="https://drbased.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 font-mono text-lg transition-colors flex items-center justify-center space-x-2"
-            >
-              <Globe className="w-5 h-5" />
-              <span>Visit drbased.net</span>
-            </a>
+          {/* Developer Link - Now inside scrollable area */}
+          <div className="mt-8">
+            <div className="bg-gradient-to-br from-gray-800 to-gray-700 border border-gray-600 rounded-xl p-6">
+              <h4 className="text-lg font-semibold text-gray-200 mb-4 text-center">
+                Developer Website
+              </h4>
+              <div className="text-center">
+                <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                  Visit the developer's website for more projects and updates:
+                </p>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+                  <a 
+                    href="https://drbased.net"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-400 hover:text-green-300 font-mono text-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Globe className="w-5 h-5" />
+                    <span>Visit drbased.net</span>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
