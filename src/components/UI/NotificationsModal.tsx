@@ -7,7 +7,9 @@ import {
   markNotificationAsRead, 
   markAllNotificationsAsRead,
   deleteNotification,
-  supabase
+  supabase,
+  getComment,
+  getBlogPostComment
 } from '../../lib/supabase';
 import { useNotifications } from './NotificationSystem';
 import { logError } from '../../lib/utils/logger';
@@ -274,6 +276,34 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         break;
       case 'chat_message':
         onSelectChatMessage(notification.sender_username);
+        break;
+      case 'comment':
+        // For comment likes, fetch the comment to get the parent pin ID
+        try {
+          const comment = await getComment(notification.entity_id);
+          if (comment) {
+            onSelectPin(comment.pin_id);
+          } else {
+            showError('Navigation Error', 'The original pin could not be found.');
+          }
+        } catch (error) {
+          console.error('Error fetching comment for navigation:', error);
+          showError('Navigation Error', 'Failed to navigate to the original pin.');
+        }
+        break;
+      case 'blog_post_comment':
+        // For blog post comment likes, fetch the comment to get the parent blog post ID
+        try {
+          const blogComment = await getBlogPostComment(notification.entity_id);
+          if (blogComment) {
+            onSelectBlogPost(blogComment.blog_post_id);
+          } else {
+            showError('Navigation Error', 'The original blog post could not be found.');
+          }
+        } catch (error) {
+          console.error('Error fetching blog post comment for navigation:', error);
+          showError('Navigation Error', 'Failed to navigate to the original blog post.');
+        }
         break;
     }
 

@@ -1231,6 +1231,52 @@ export const getUserBlogPostCommentLikes = async (commentIds: string[], username
   }
 };
 
+// Get individual comment by ID (for navigation from notifications)
+export const getComment = async (commentId: string): Promise<Comment | null> => {
+  if (!supabase) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('id', commentId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching comment:', error);
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch comment:', err);
+    return null;
+  }
+};
+
+// Get individual blog post comment by ID (for navigation from notifications)
+export const getBlogPostComment = async (commentId: string): Promise<BlogPostComment | null> => {
+  if (!supabase) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('blog_post_comments')
+      .select('*')
+      .eq('id', commentId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching blog post comment:', error);
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch blog post comment:', err);
+    return null;
+  }
+};
+
 // Pin update function
 export const updatePin = async (
   pinId: string,
