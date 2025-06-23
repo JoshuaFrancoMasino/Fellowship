@@ -86,6 +86,7 @@ class ChatService {
   }
 
   async sendDirectMessage(recipientUsername: string, message: string): Promise<boolean> {
+  }
   async sendDirectMessage(recipientUsername: string, message: string, mediaUrl?: string): Promise<boolean> {
     if (!supabase || !this.isAuthenticated) {
       console.error('❌ Supabase not available or user not authenticated');

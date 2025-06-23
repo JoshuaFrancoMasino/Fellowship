@@ -493,6 +493,7 @@ function App() {
   };
 
   const handleCommentPin = async (pinId: string, comment: string) => {
+  }
   const handleCommentPin = async (pinId: string, comment: string, mediaUrl?: string) => {
     if (!isConnected || !supabase) {
       alert('Cannot add comments - database connection unavailable.');
