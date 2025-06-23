@@ -255,18 +255,22 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
         </div>
+
+        {/* Developer Link */}
+        <div className="px-6 pb-6">
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+            <a 
+              href="https://drbased.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 font-mono text-lg transition-colors flex items-center justify-center space-x-2"
+            >
+              <Globe className="w-5 h-5" />
+              <span>Visit drbased.net</span>
+            </a>
+          </div>
+        </div>
       </div>
-    </div>
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
-      <a 
-        href="https://drbased.net"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-green-400 hover:text-green-300 font-mono text-lg transition-colors flex items-center justify-center space-x-2"
-      >
-        <Globe className="w-5 h-5" />
-        <span>Visit drbased.net</span>
-      </a>
     </div>
   );
 };
