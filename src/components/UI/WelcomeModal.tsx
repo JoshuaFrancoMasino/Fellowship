@@ -78,7 +78,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) => {
                 </li>
                 <li className="flex items-center space-x-2">
                   <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                  <span>Filter by location and explore globally</span>
+                  <span>Filter by location and explore across the earth</span>
                 </li>
               </ul>
             </div>
