@@ -42,21 +42,31 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [subscriptionRef, setSubscriptionRef] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
       fetchNotifications();
       fetchUnreadCount();
-      setupRealtimeSubscription();
+      const subscription = setupRealtimeSubscription();
+      setSubscriptionRef(subscription);
     }
 
     return () => {
-      // Cleanup subscription on unmount
-      if (supabase) {
-        supabase.removeAllChannels();
+      // Cleanup subscription on unmount or when modal closes
+      if (subscriptionRef) {
+        subscriptionRef.unsubscribe();
+        setSubscriptionRef(null);
       }
     };
-  }, [isOpen, isAuthenticated, currentUser, filter]);
+  }, [isOpen, isAuthenticated, currentUser]);
+
+  // Separate effect for filter changes to avoid recreating subscription
+  useEffect(() => {
+    if (isOpen && isAuthenticated) {
+      fetchNotifications();
+    }
+  }, [filter]);
 
   const setupRealtimeSubscription = () => {
     if (!supabase || !isAuthenticated) return;
@@ -70,9 +80,20 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           table: 'notifications',
           filter: `recipient_username=eq.${currentUser}`
         },
-        () => {
-          fetchNotifications();
-          fetchUnreadCount();
+        (payload) => {
+          // Only refetch if it's not a delete event, or if it's an insert/update
+          if (payload.eventType !== 'DELETE' || payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            fetchNotifications();
+            fetchUnreadCount();
+          } else if (payload.eventType === 'DELETE') {
+            // For delete events, just remove the notification from local state
+            // to prevent refetching and reappearing
+            const deletedId = payload.old?.id;
+            if (deletedId) {
+              setNotifications(prev => prev.filter(n => n.id !== deletedId));
+              fetchUnreadCount();
+            }
+          }
         }
       )
       .subscribe();
@@ -90,7 +111,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       setNotifications(data);
     } catch (error) {
       logError('Error fetching notifications', error instanceof Error ? error : new Error(String(error)));
-      showError('Failed to Load', 'Could not fetch notifications');
+      showError('Failed to Load', 'Could not fetch notifications. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -102,6 +123,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       setUnreadCount(count);
     } catch (error) {
       logError('Error fetching unread count', error instanceof Error ? error : new Error(String(error)));
+      // Don't show error to user for unread count failures - it's not critical
     }
   };
 
@@ -115,11 +137,11 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         fetchUnreadCount();
         onNotificationAction(); // Refresh notification counts
       } else {
-        showError('Update Failed', 'Could not mark notification as read');
+        showError('Update Failed', 'Could not mark notification as read. Please check your connection.');
       }
     } catch (error) {
       logError('Error marking notification as read', error instanceof Error ? error : new Error(String(error)));
-      showError('Update Failed', 'Could not mark notification as read');
+      showError('Update Failed', 'Could not mark notification as read. Please check your connection.');
     }
   };
 
@@ -132,28 +154,35 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         showSuccess('Success', 'All notifications marked as read');
         onNotificationAction(); // Refresh notification counts
       } else {
-        showError('Update Failed', 'Could not mark all notifications as read');
+        showError('Update Failed', 'Could not mark all notifications as read. Please check your connection.');
       }
     } catch (error) {
       logError('Error marking all notifications as read', error instanceof Error ? error : new Error(String(error)));
-      showError('Update Failed', 'Could not mark all notifications as read');
+      showError('Update Failed', 'Could not mark all notifications as read. Please check your connection.');
     }
   };
 
   const handleDeleteNotification = async (notificationId: string) => {
+    // Optimistically remove from UI first
+    const previousNotifications = notifications;
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    
     try {
       const success = await deleteNotification(notificationId);
       if (success) {
-        setNotifications(prev => prev.filter(n => n.id !== notificationId));
         fetchUnreadCount();
         onNotificationAction(); // Refresh notification counts
         showSuccess('Deleted', 'Notification removed');
       } else {
-        showError('Delete Failed', 'Could not delete notification');
+        // Revert optimistic update
+        setNotifications(previousNotifications);
+        showError('Delete Failed', 'Could not delete notification. Please check your connection.');
       }
     } catch (error) {
+      // Revert optimistic update
+      setNotifications(previousNotifications);
       logError('Error deleting notification', error instanceof Error ? error : new Error(String(error)));
-      showError('Delete Failed', 'Could not delete notification');
+      showError('Delete Failed', 'Could not delete notification. Please check your connection.');
     }
   };
 

@@ -1035,6 +1035,10 @@ export const getUnreadNotificationCount = async (username: string): Promise<numb
     return count || 0;
   } catch (err) {
     console.error('Failed to fetch unread notification count:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase. Using cached/default value.');
+    }
     return 0;
   }
 };
@@ -1063,9 +1067,14 @@ export const getUnreadNotificationCountByType = async (username: string, entityT
     return count || 0;
   } catch (err) {
     console.error('Failed to fetch unread notification count by type:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase. Using cached/default value.');
+    }
     return 0;
   }
 };
+
 export const markNotificationAsRead = async (notificationId: string): Promise<boolean> => {
   if (!supabase) return false;
   
@@ -1078,6 +1087,10 @@ export const markNotificationAsRead = async (notificationId: string): Promise<bo
     return !error;
   } catch (err) {
     console.error('Failed to mark notification as read:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase for marking as read.');
+    }
     return false;
   }
 };
@@ -1095,6 +1108,10 @@ export const markAllNotificationsAsRead = async (username: string): Promise<bool
     return !error;
   } catch (err) {
     console.error('Failed to mark all notifications as read:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase for marking all as read.');
+    }
     return false;
   }
 };
@@ -1111,6 +1128,42 @@ export const deleteNotification = async (notificationId: string): Promise<boolea
     return !error;
   } catch (err) {
     console.error('Failed to delete notification:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase for deletion.');
+    }
     return false;
+  }
+};
+
+export const getNotificationsForUser = async (username: string, isRead?: boolean): Promise<Notification[]> => {
+  if (!supabase) return [];
+  
+  try {
+    let query = supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_username', username)
+      .order('created_at', { ascending: false });
+
+    if (isRead !== undefined) {
+      query = query.eq('is_read', isRead);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch notifications:', err);
+    // Handle network errors gracefully
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('Network error: Unable to connect to Supabase for fetching notifications.');
+    }
+    return [];
   }
 };
