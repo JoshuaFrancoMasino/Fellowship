@@ -294,7 +294,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="glass-header p-6 text-white">
           <div className="flex items-center justify-between">
@@ -501,7 +501,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
         </div>
 
         {/* Pins Grid */}
-        <div className="p-6 overflow-y-auto max-h-full pb-[40rem]">
+        <div className="flex-1 overflow-y-auto p-6 pb-[40rem]">
           {filteredAndSortedPins.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -683,7 +683,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-700 p-4 bg-gray-900">
+        <div className="border-t border-gray-700 p-4 bg-gray-900 flex-shrink-0">
           <div className="text-center text-sm text-gray-400">
             Showing {filteredAndSortedPins.length} of {pins.length} pins
             {sortBy === 'most-liked' && (
