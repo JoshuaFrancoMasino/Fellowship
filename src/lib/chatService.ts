@@ -115,7 +115,7 @@ class ChatService {
             message: message.trim(),
             media_url: mediaUrl || null,
           }
-        ]);
+        ])
         .select('id')
         .single();
 
