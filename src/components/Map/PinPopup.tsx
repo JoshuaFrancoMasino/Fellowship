@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Trash2, X, User, Edit, Image, Upload } from 'lucide-react';
-import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile, createNotification } from '../../lib/supabase';
+import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile, createNotification, toggleCommentLike, getCommentLikeCounts, getUserCommentLikes } from '../../lib/supabase';
 import { useNotifications } from '../UI/NotificationSystem';
 import { logError } from '../../lib/utils/logger';
 
@@ -39,6 +39,9 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [selectedCommentFile, setSelectedCommentFile] = useState<File | null>(null);
   const [isUploadingCommentFile, setIsUploadingCommentFile] = useState(false);
+  const [commentLikeCounts, setCommentLikeCounts] = useState<{ [key: string]: number }>({});
+  const [userCommentLikes, setUserCommentLikes] = useState<{ [key: string]: boolean }>({});
+  const [togglingCommentLike, setTogglingCommentLike] = useState<string | null>(null);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if username is a guest user (7-digit number)
@@ -54,6 +57,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
   useEffect(() => {
     if (comments.length > 0) {
       fetchCommentProfilePictures();
+      fetchCommentLikeData();
     }
   }, [comments]);
 
@@ -92,6 +96,83 @@ const PinPopup: React.FC<PinPopupProps> = ({
     }
 
     setCommentProfilePictures(cache);
+  };
+
+  const fetchCommentLikeData = async () => {
+    if (comments.length === 0) return;
+
+    const commentIds = comments.map(comment => comment.id);
+
+    try {
+      // Fetch like counts for all comments
+      const likeCounts = await getCommentLikeCounts(commentIds);
+      setCommentLikeCounts(likeCounts);
+
+      // Fetch user's likes for these comments
+      if (currentUser) {
+        const userLikes = await getUserCommentLikes(commentIds, currentUser);
+        setUserCommentLikes(userLikes);
+      }
+    } catch (error) {
+      console.error('Error fetching comment like data:', error);
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: string) => {
+    if (!currentUser) {
+      showWarning('Sign In Required', 'Please sign in to like comments');
+      return;
+    }
+
+    setTogglingCommentLike(commentId);
+
+    // Optimistic UI updates
+    const currentLikeCount = commentLikeCounts[commentId] || 0;
+    const userHasLiked = userCommentLikes[commentId] || false;
+
+    const newLikeCount = userHasLiked ? currentLikeCount - 1 : currentLikeCount + 1;
+    const newUserLikeStatus = !userHasLiked;
+
+    // Update UI immediately
+    setCommentLikeCounts(prev => ({
+      ...prev,
+      [commentId]: Math.max(0, newLikeCount)
+    }));
+    setUserCommentLikes(prev => ({
+      ...prev,
+      [commentId]: newUserLikeStatus
+    }));
+
+    try {
+      const success = await toggleCommentLike(commentId, currentUser);
+
+      if (!success) {
+        // Revert optimistic updates on failure
+        setCommentLikeCounts(prev => ({
+          ...prev,
+          [commentId]: currentLikeCount
+        }));
+        setUserCommentLikes(prev => ({
+          ...prev,
+          [commentId]: userHasLiked
+        }));
+        showError('Like Failed', 'Failed to update like status');
+      }
+    } catch (error) {
+      logError('Error toggling comment like', error instanceof Error ? error : new Error(String(error)));
+      // Revert optimistic updates on error
+      setCommentLikeCounts(prev => ({
+        ...prev,
+        [commentId]: currentLikeCount
+      }));
+      setUserCommentLikes(prev => ({
+        ...prev,
+        [commentId]: userHasLiked
+      }));
+      showError('Like Failed', 'Failed to update like status');
+    } finally {
+      setTogglingCommentLike(null);
+    }
   };
 
   const fetchComments = async () => {
@@ -527,6 +608,9 @@ const PinPopup: React.FC<PinPopupProps> = ({
             const commentProfilePicture = commentProfilePictures[comment.username];
             const canDeleteThisComment = canDeleteComment(comment);
             const isDeletingThisComment = deletingCommentId === comment.id;
+            const commentLikeCount = commentLikeCounts[comment.id] || 0;
+            const userHasLikedComment = userCommentLikes[comment.id] || false;
+            const isTogglingThisComment = togglingCommentLike === comment.id;
 
             return (
               <div key={comment.id} className="flex items-start space-x-2 group">
@@ -556,7 +640,8 @@ const PinPopup: React.FC<PinPopupProps> = ({
 
                 {/* Comment Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="text-sm flex-1">
                     {isGuestUser(comment.username) ? (
                       // Non-clickable version for guest users
                       <span className="font-medium text-blue-400 cursor-default">
@@ -574,6 +659,34 @@ const PinPopup: React.FC<PinPopupProps> = ({
                     {comment.text && (
                       <span className="text-gray-200 ml-2">{comment.text}</span>
                     )}
+                    </div>
+                    
+                    {/* Comment Like Button */}
+                    <div className="flex items-center space-x-1 ml-2">
+                      {commentLikeCount > 0 && (
+                        <span className="text-xs text-gray-400">
+                          {commentLikeCount}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleToggleCommentLike(comment.id)}
+                        disabled={isTogglingThisComment}
+                        className={`p-1 rounded-full transition-all duration-200 hover:scale-110 ${
+                          userHasLikedComment
+                            ? 'text-red-400 hover:text-red-300'
+                            : 'text-gray-400 hover:text-red-300'
+                        } ${isTogglingThisComment ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={userHasLikedComment ? 'Unlike comment' : 'Like comment'}
+                      >
+                        {isTogglingThisComment ? (
+                          <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <Heart
+                            className={`w-3 h-3 ${userHasLikedComment ? 'fill-current' : ''}`}
+                          />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Media content */}
