@@ -689,7 +689,6 @@ function App() {
         </div>
       )}
     </div>
-      </div>
     </NotificationProvider>
   );
 }
