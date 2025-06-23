@@ -4,6 +4,8 @@ import { MarketplaceItem, getMarketplaceItems, deleteMarketplaceItem, getCurrent
 import CreateListingModal from './CreateListingModal';
 import MarketplaceItemDetailModal from './MarketplaceItemDetailModal';
 import { chatService } from '../../lib/chatService';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface MarketplaceModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
   onOpenUserProfile,
   initialItem = null,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -154,8 +157,8 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         setSelectedItem(null); // Close the detail view if it's the deleted item
       }
     } catch (error) {
-      console.error('Error deleting marketplace item:', error);
-      alert('Failed to delete listing. Please try again.');
+      logError('Error deleting marketplace item', error instanceof Error ? error : new Error(String(error)));
+      showError('Delete Failed', 'Failed to delete listing. Please try again.');
     }
   };
 
@@ -195,17 +198,17 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
 
   const handleContactSeller = async (item: MarketplaceItem) => {
     if (!isAuthenticated) {
-      alert('Please sign in to contact sellers');
+      showWarning('Sign In Required', 'Please sign in to contact sellers');
       return;
     }
 
     if (!contactMessage.trim()) {
-      alert('Please enter a message');
+      showWarning('Message Required', 'Please enter a message');
       return;
     }
 
     if (item.seller_username === currentUser) {
-      alert('You cannot contact yourself');
+      showWarning('Invalid Action', 'You cannot contact yourself');
       return;
     }
 
@@ -220,13 +223,13 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         setContactingItem(null);
         setContactMessage('');
         onOpenChatWindow(item.seller_username);
-        alert('Message sent! Check your direct messages to continue the conversation.');
+        showSuccess('Message Sent', 'Check your direct messages to continue the conversation.');
       } else {
-        alert('Failed to send message. Please try again.');
+        showError('Send Failed', 'Failed to send message. Please try again.');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      logError('Error sending message', error instanceof Error ? error : new Error(String(error)));
+      showError('Send Failed', 'Failed to send message. Please try again.');
     }
   };
 

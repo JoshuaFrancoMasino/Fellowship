@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, Camera, Plus, Upload, Palette, Save, UserPlus, Globe, AlertCircle } from 'lucide-react';
 import { Pin, supabase, uploadImage, getImageUrl, TRIBE_COLORS, TribeName, getCurrentUserProfile } from '../../lib/supabase';
 import { reverseGeocode, LocationData } from '../../lib/geocoding';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface PinFormModalProps {
   isOpen: boolean;
@@ -29,6 +31,7 @@ const PinFormModal: React.FC<PinFormModalProps> = ({
   initialLat = 0,
   initialLng = 0,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState('');
@@ -116,9 +119,10 @@ const PinFormModal: React.FC<PinFormModalProps> = ({
       
       // Only reset and close if submission was successful
       resetForm();
+      showSuccess('Success', `Pin ${isEditMode ? 'updated' : 'created'} successfully!`);
       onClose();
     } catch (error: any) {
-      console.error('Pin operation failed:', error);
+      logError('Pin operation failed', error);
       setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} pin. Please try again.`);
     } finally {
       setIsSubmitting(false);
@@ -153,13 +157,13 @@ const PinFormModal: React.FC<PinFormModalProps> = ({
       
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select only image files');
+        showError('Invalid File Type', 'Please select only image files');
         continue;
       }
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size must be less than 5MB');
+        showError('File Too Large', 'Image size must be less than 5MB');
         continue;
       }
 
@@ -171,8 +175,8 @@ const PinFormModal: React.FC<PinFormModalProps> = ({
           setUploadedPaths(prev => [...prev, path]);
         }
       } catch (error) {
-        console.error('Error uploading file:', error);
-        alert('Failed to upload image');
+        logError('Error uploading file', error instanceof Error ? error : new Error(String(error)));
+        showError('Upload Failed', 'Failed to upload image');
       }
     }
     

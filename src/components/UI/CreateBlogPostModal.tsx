@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, BookOpen, Save, Eye, EyeOff, AlertCircle, Image, Upload } from 'lucide-react';
 import { createBlogPost, updateBlogPost, BlogPost, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface CreateBlogPostModalProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
   isAuthenticated,
   initialPost = null,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isPublished, setIsPublished] = useState(false);
@@ -81,13 +84,13 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      showError('Invalid File Type', 'Please select an image file');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
+      showError('File Too Large', 'Image size must be less than 5MB');
       return;
     }
 
@@ -96,7 +99,7 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     try {
       const profile = await getCurrentUserProfile();
       if (!profile) {
-        alert('Please sign in to upload images');
+        showWarning('Sign In Required', 'Please sign in to upload images');
         return;
       }
 
@@ -115,8 +118,8 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
       insertAtCursor(imageHtml);
       
     } catch (error) {
-      console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
+      logError('Error uploading image', error instanceof Error ? error : new Error(String(error)));
+      showError('Upload Failed', 'Failed to upload image. Please try again.');
     } finally {
       setIsUploadingImage(false);
       // Reset file input
@@ -163,17 +166,13 @@ const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
       
       // Success - reset form and close modal
       resetForm();
+      const action = isEditMode ? 'updated' : isPublished ? 'published' : 'saved as draft';
+      showSuccess('Success', `Blog post ${action} successfully!`);
       onSuccess(); // This will refresh the blog list
       onClose(); // Close the modal
       
-      // Show success message
-      setTimeout(() => {
-        const action = isEditMode ? 'updated' : isPublished ? 'published' : 'saved as draft';
-        alert(`Blog post ${action} successfully!`);
-      }, 100);
-      
     } catch (error: any) {
-      console.error(`Failed to ${isEditMode ? 'update' : 'create'} blog post:`, error);
+      logError(`Failed to ${isEditMode ? 'update' : 'create'} blog post`, error);
       setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} blog post. Please try again.`);
     } finally {
       setIsSubmitting(false);

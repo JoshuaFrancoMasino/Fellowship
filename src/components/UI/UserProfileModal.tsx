@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText, BookOpen, ShoppingBag } from 'lucide-react';
 import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase, BlogPost, MarketplaceItem, getUserBlogPosts, getUserMarketplaceItems } from '../../lib/supabase';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isCurrentUserAdmin = false,
   onOpenChatWindow,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [userPins, setUserPins] = useState<Pin[]>([]);
   const [userBlogPosts, setUserBlogPosts] = useState<BlogPost[]>([]);
   const [userMarketplaceItems, setUserMarketplaceItems] = useState<MarketplaceItem[]>([]);
@@ -149,13 +152,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      showError('Invalid File Type', 'Please select an image file');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
+      showError('File Too Large', 'Image size must be less than 5MB');
       return;
     }
 
@@ -191,10 +194,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       // Re-fetch profile data to update UI
       await fetchProfileData();
       
-      alert('Profile picture updated successfully!');
+      showSuccess('Profile Updated', 'Profile picture updated successfully!');
     } catch (error) {
-      console.error('❌ Error updating profile picture:', error);
-      alert('Failed to update profile picture. Please try again.');
+      logError('Error updating profile picture', error instanceof Error ? error : new Error(String(error)));
+      showError('Update Failed', 'Failed to update profile picture. Please try again.');
     } finally {
       setIsUploadingProfilePicture(false);
       // Reset file input
@@ -222,10 +225,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       // Re-fetch profile data to update UI
       await fetchProfileData();
       setIsEditingProfile(false);
-      alert('Profile updated successfully!');
+      showSuccess('Profile Updated', 'Profile information updated successfully!');
     } catch (error) {
-      console.error('❌ Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
+      logError('Error updating profile', error instanceof Error ? error : new Error(String(error)));
+      showError('Update Failed', 'Failed to update profile. Please try again.');
     } finally {
       setSavingProfile(false);
     }
@@ -233,12 +236,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const handleDirectMessage = () => {
     if (!isAuthenticated) {
-      alert('Please sign in to send direct messages');
+      showWarning('Sign In Required', 'Please sign in to send direct messages');
       return;
     }
     
     if (isOwnProfile) {
-      alert('You cannot message yourself');
+      showWarning('Invalid Action', 'You cannot message yourself');
       return;
     }
 

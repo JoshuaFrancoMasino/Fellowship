@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2, Heart, Image, Upload } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
 import { getProfileByUsername, getCurrentUserProfile, toggleChatMessageLike, getChatMessageLikeCounts, getUserChatMessageLikes, uploadImage, getImageUrl } from '../../lib/supabase';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -18,6 +20,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   isAuthenticated,
   initialRecipientUsername = '',
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [recipientUsername, setRecipientUsername] = useState<string>(initialRecipientUsername);
@@ -146,7 +149,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleToggleMessageLike = async (messageId: string) => {
     if (!currentUser) {
-      alert('Please sign in to like messages');
+      showWarning('Sign In Required', 'Please sign in to like messages');
       return;
     }
 
@@ -182,10 +185,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           ...prev,
           [messageId]: userHasLiked
         }));
-        alert('Failed to update like status');
+        showError('Like Failed', 'Failed to update like status');
       }
     } catch (error) {
-      console.error('Error toggling message like:', error);
+      logError('Error toggling message like', error instanceof Error ? error : new Error(String(error)));
       // Revert optimistic updates on error
       setMessageLikeCounts(prev => ({
         ...prev,
@@ -195,7 +198,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         ...prev,
         [messageId]: userHasLiked
       }));
-      alert('Failed to update like status');
+      showError('Like Failed', 'Failed to update like status');
     } finally {
       setTogglingLike(null);
     }
@@ -265,7 +268,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         setIsUploadingFile(true);
         const profile = await getCurrentUserProfile();
         if (profile) {
-          const path = await uploadImage(selectedFile, profile.id, 'chat-and-comment-media');
+          const path = await uploadImage(selectedFile, profile.id, 'chat-and-comment-media'); 
           if (path) {
             mediaUrl = getImageUrl(path, 'chat-and-comment-media');
           }
@@ -285,12 +288,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         setMessageError('');
         // Refresh conversations list to update last message
         await fetchConversations();
+        showSuccess('Message Sent', 'Your message has been delivered successfully.');
         // Message will be added via the real-time subscription
       } else {
         setMessageError('Failed to send message');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      logError('Error sending message', error instanceof Error ? error : new Error(String(error)));
       setMessageError('Failed to send message');
     } finally {
       setIsLoading(false);
@@ -322,10 +326,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         if (file.size <= 5 * 1024 * 1024) {
           setSelectedFile(file);
         } else {
-          alert('File size must be less than 5MB');
+          showError('File Too Large', 'File size must be less than 5MB');
         }
       } else {
-        alert('Please select an image or GIF file');
+        showError('Invalid File Type', 'Please select an image or GIF file');
       }
     }
     
@@ -375,13 +379,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           handleBackToConversations();
         }
         
-        alert('Conversation deleted successfully');
+        showSuccess('Conversation Deleted', 'Conversation has been removed successfully.');
       } else {
-        alert('Failed to delete conversation. Please try again.');
+        showError('Delete Failed', 'Failed to delete conversation. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting conversation:', error);
-      alert('Failed to delete conversation. Please try again.');
+      logError('Error deleting conversation', error instanceof Error ? error : new Error(String(error)));
+      showError('Delete Failed', 'Failed to delete conversation. Please try again.');
     } finally {
       setDeletingConversation(null);
       setShowDeleteConfirmation(null);

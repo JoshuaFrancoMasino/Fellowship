@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus, DollarSign, Package, AlertCircle, Save } from 'lucide-react';
 import { createMarketplaceItem, updateMarketplaceItem, uploadImage, getImageUrl, getCurrentUserProfile, MarketplaceItem } from '../../lib/supabase';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
   isAuthenticated,
   initialItem = null,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -102,9 +105,10 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
       }
 
       resetForm();
+      showSuccess('Success', `Listing ${isEditMode ? 'updated' : 'created'} successfully!`);
       onSuccess();
     } catch (error: any) {
-      console.error(`Failed to ${isEditMode ? 'update' : 'create'} listing:`, error);
+      logError(`Failed to ${isEditMode ? 'update' : 'create'} listing`, error);
       setSubmitError(error.message || `Failed to ${isEditMode ? 'update' : 'create'} listing. Please try again.`);
     } finally {
       setIsSubmitting(false);
@@ -127,7 +131,7 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
     try {
       const profile = await getCurrentUserProfile();
       if (!profile) {
-        alert('Please sign in to upload images');
+        showWarning('Sign In Required', 'Please sign in to upload images');
         return;
       }
 
@@ -136,13 +140,13 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
         
         // Validate file type
         if (!file.type.startsWith('image/')) {
-          alert('Please select only image files');
+          showError('Invalid File Type', 'Please select only image files');
           continue;
         }
         
         // Validate file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-          alert('Image size must be less than 5MB');
+          showError('File Too Large', 'Image size must be less than 5MB');
           continue;
         }
 
@@ -154,13 +158,13 @@ const CreateListingModal: React.FC<CreateListingModalProps> = ({
             setUploadedPaths(prev => [...prev, path]);
           }
         } catch (error) {
-          console.error('Error uploading file:', error);
-          alert('Failed to upload image');
+          logError('Error uploading file', error instanceof Error ? error : new Error(String(error)));
+          showError('Upload Failed', 'Failed to upload image');
         }
       }
     } catch (error) {
-      console.error('Error in file upload:', error);
-      alert('Failed to upload images');
+      logError('Error in file upload', error instanceof Error ? error : new Error(String(error)));
+      showError('Upload Failed', 'Failed to upload images');
     } finally {
       setUploading(false);
       // Reset the input
