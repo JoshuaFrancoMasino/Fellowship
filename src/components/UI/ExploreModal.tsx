@@ -296,7 +296,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="glass-header p-6 text-white">
+        <div className="glass-header p-3 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 glass-white rounded-full flex items-center justify-center">
@@ -319,7 +319,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
         </div>
 
         {/* Search and Filter Bar */}
-        <div className="p-6 border-b border-gray-700">
+        <div className="p-3 border-b border-gray-700">
           <div className="flex flex-col gap-4">
             {/* Main Search and Sort Row */}
             <div className="flex flex-col sm:flex-row gap-4">
@@ -331,7 +331,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search pins or users..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400"
                 />
               </div>
 
@@ -341,7 +341,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'most-liked')}
-                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200"
+                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200"
                 >
                   <option value="most-liked">Most Liked</option>
                   <option value="newest">Newest First</option>
@@ -353,6 +353,11 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
               <button
                 onClick={() => setShowLocationFilters(!showLocationFilters)}
                 className={`flex items-center space-x-2 px-4 py-3 rounded-lg border transition-colors ${
+                  showLocationFilters || hasActiveLocationFilters
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700'
+                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
                   showLocationFilters || hasActiveLocationFilters
                     ? 'bg-blue-600 border-blue-500 text-white'
                     : 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700'
@@ -389,7 +394,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                     <select
                       value={locationFilters.continent}
                       onChange={(e) => handleLocationFilterChange('continent', e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm"
+                      className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm"
                     >
                       <option value="">All Continents</option>
                       {getFilteredOptions('continent').map(continent => (
@@ -405,7 +410,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                       value={locationFilters.country}
                       onChange={(e) => handleLocationFilterChange('country', e.target.value)}
                       disabled={!locationFilters.continent}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">All Countries</option>
                       {getFilteredOptions('country').map(country => (
@@ -421,7 +426,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                       value={locationFilters.state}
                       onChange={(e) => handleLocationFilterChange('state', e.target.value)}
                       disabled={!locationFilters.country}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">All States</option>
                       {getFilteredOptions('state').map(state => (
@@ -437,7 +442,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
                       value={locationFilters.locality}
                       onChange={(e) => handleLocationFilterChange('locality', e.target.value)}
                       disabled={!locationFilters.state}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">All Cities</option>
                       {getFilteredOptions('locality').map(locality => (
