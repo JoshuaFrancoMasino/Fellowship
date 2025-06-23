@@ -5,6 +5,7 @@ export interface ChatMessage {
   pin_id: string;
   username: string;
   message: string;
+  media_url?: string;
   created_at: string;
 }
 
@@ -84,7 +85,7 @@ class ChatService {
     }
   }
 
-  async sendDirectMessage(recipientUsername: string, message: string): Promise<boolean> {
+  async sendDirectMessage(recipientUsername: string, message: string, mediaUrl?: string): Promise<boolean> {
     if (!supabase || !this.isAuthenticated) {
       console.error('❌ Supabase not available or user not authenticated');
       return false;
@@ -101,6 +102,7 @@ class ChatService {
             pin_id: conversationId,
             username: this.currentUser,
             message: message.trim(),
+            media_url: mediaUrl || null,
           }
         ]);
 

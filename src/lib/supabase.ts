@@ -49,6 +49,7 @@ export type Comment = {
   username: string;
   pin_id: string;
   text: string;
+  media_url?: string;
   created_at: string;
 };
 
@@ -57,6 +58,7 @@ export type ChatMessage = {
   pin_id: string;
   username: string;
   message: string;
+  media_url?: string;
   created_at: string;
 };
 
@@ -127,6 +129,7 @@ export type BlogPostComment = {
   blog_post_id: string;
   username: string;
   text: string;
+  media_url?: string;
   created_at: string;
 };
 
@@ -830,7 +833,8 @@ export const getBlogPostComments = async (blogPostId: string): Promise<BlogPostC
 export const createBlogPostComment = async (
   blogPostId: string,
   username: string,
-  text: string
+  text: string,
+  mediaUrl?: string
 ): Promise<boolean> => {
   if (!supabase) return false;
   
@@ -842,6 +846,7 @@ export const createBlogPostComment = async (
           blog_post_id: blogPostId,
           username: username.trim(),
           text: text.trim(),
+          media_url: mediaUrl || null,
         }
       ]);
 
