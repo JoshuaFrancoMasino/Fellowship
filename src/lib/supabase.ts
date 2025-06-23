@@ -1039,6 +1039,33 @@ export const getUnreadNotificationCount = async (username: string): Promise<numb
   }
 };
 
+export const getUnreadNotificationCountByType = async (username: string, entityType?: string): Promise<number> => {
+  if (!supabase) return 0;
+  
+  try {
+    let query = supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_username', username)
+      .eq('is_read', false);
+
+    if (entityType) {
+      query = query.eq('entity_type', entityType);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      console.error('Error fetching unread notification count by type:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (err) {
+    console.error('Failed to fetch unread notification count by type:', err);
+    return 0;
+  }
+};
 export const markNotificationAsRead = async (notificationId: string): Promise<boolean> => {
   if (!supabase) return false;
   
