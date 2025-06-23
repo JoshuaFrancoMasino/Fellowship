@@ -133,12 +133,26 @@ export type BlogPostComment = {
   created_at: string;
 };
 
+export type CommentLike = {
+  id: string;
+  comment_id: string;
+  username: string;
+  created_at: string;
+};
+
+export type BlogPostCommentLike = {
+  id: string;
+  blog_post_comment_id: string;
+  username: string;
+  created_at: string;
+};
+
 export type Notification = {
   id: string;
   recipient_username: string;
   sender_username: string;
   type: 'like' | 'comment' | 'message';
-  entity_type: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message';
+  entity_type: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message' | 'comment' | 'blog_post_comment';
   entity_id: string;
   message: string;
   is_read: boolean;
@@ -937,6 +951,286 @@ export const deleteBlogPostComment = async (commentId: string): Promise<boolean>
   }
 };
 
+// Comment like functions for pin comments
+export const toggleCommentLike = async (commentId: string, username: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    console.log('❤️ Toggling comment like:', { commentId, username });
+    
+    // Check if like already exists
+    const { data: existingLike, error: selectError } = await supabase
+      .from('comment_likes')
+      .select('id')
+      .eq('comment_id', commentId)
+      .eq('username', username)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('❌ Error checking existing comment like:', selectError);
+      return false;
+    }
+
+    if (existingLike) {
+      // Remove like
+      console.log('👎 Removing existing comment like...');
+      const { error: deleteError } = await supabase
+        .from('comment_likes')
+        .delete()
+        .eq('id', existingLike.id);
+
+      if (deleteError) {
+        console.error('❌ Error deleting comment like:', deleteError);
+        return false;
+      }
+      
+      console.log('✅ Comment like removed successfully');
+      return true;
+    } else {
+      // Add like
+      console.log('👍 Adding new comment like...');
+      const { error: insertError } = await supabase
+        .from('comment_likes')
+        .insert([
+          {
+            comment_id: commentId,
+            username: username,
+          }
+        ]);
+
+      if (insertError) {
+        console.error('❌ Error inserting comment like:', insertError);
+        return false;
+      }
+      
+      // Create notification for comment author
+      const { data: comment } = await supabase
+        .from('comments')
+        .select('username, pin_id')
+        .eq('id', commentId)
+        .single();
+      
+      if (comment && comment.username !== username) {
+        await createNotification(
+          comment.username,
+          username,
+          'like',
+          'comment',
+          commentId,
+          `${username} liked your comment`
+        );
+      }
+      
+      console.log('✅ Comment like added successfully');
+      return true;
+    }
+  } catch (err) {
+    console.error('💥 Failed to toggle comment like:', err);
+    return false;
+  }
+};
+
+export const getCommentLikeCounts = async (commentIds: string[]): Promise<{ [key: string]: number }> => {
+  if (!supabase || commentIds.length === 0) return {};
+  
+  try {
+    console.log('🔢 Fetching comment like counts for:', commentIds.length, 'comments');
+    
+    const { data, error } = await supabase
+      .from('comment_likes')
+      .select('comment_id')
+      .in('comment_id', commentIds);
+
+    if (error) {
+      console.error('❌ Error fetching comment like counts:', error);
+      return {};
+    }
+
+    // Count likes per comment
+    const likeCounts: { [key: string]: number } = {};
+    data?.forEach(like => {
+      likeCounts[like.comment_id] = (likeCounts[like.comment_id] || 0) + 1;
+    });
+
+    console.log('✅ Comment like counts fetched:', likeCounts);
+    return likeCounts;
+  } catch (err) {
+    console.error('💥 Failed to fetch comment like counts:', err);
+    return {};
+  }
+};
+
+export const getUserCommentLikes = async (commentIds: string[], username: string): Promise<{ [key: string]: boolean }> => {
+  if (!supabase || commentIds.length === 0) return {};
+  
+  try {
+    console.log('👤 Fetching user comment likes for:', username, 'on', commentIds.length, 'comments');
+    
+    const { data, error } = await supabase
+      .from('comment_likes')
+      .select('comment_id')
+      .in('comment_id', commentIds)
+      .eq('username', username);
+
+    if (error) {
+      console.error('❌ Error fetching user comment likes:', error);
+      return {};
+    }
+
+    // Create lookup for user's likes
+    const userLikes: { [key: string]: boolean } = {};
+    data?.forEach(like => {
+      userLikes[like.comment_id] = true;
+    });
+
+    console.log('✅ User comment likes fetched:', userLikes);
+    return userLikes;
+  } catch (err) {
+    console.error('💥 Failed to fetch user comment likes:', err);
+    return {};
+  }
+};
+
+// Blog post comment like functions
+export const toggleBlogPostCommentLike = async (commentId: string, username: string): Promise<boolean> => {
+  if (!supabase) return false;
+  
+  try {
+    console.log('❤️ Toggling blog post comment like:', { commentId, username });
+    
+    // Check if like already exists
+    const { data: existingLike, error: selectError } = await supabase
+      .from('blog_post_comment_likes')
+      .select('id')
+      .eq('blog_post_comment_id', commentId)
+      .eq('username', username)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('❌ Error checking existing blog post comment like:', selectError);
+      return false;
+    }
+
+    if (existingLike) {
+      // Remove like
+      console.log('👎 Removing existing blog post comment like...');
+      const { error: deleteError } = await supabase
+        .from('blog_post_comment_likes')
+        .delete()
+        .eq('id', existingLike.id);
+
+      if (deleteError) {
+        console.error('❌ Error deleting blog post comment like:', deleteError);
+        return false;
+      }
+      
+      console.log('✅ Blog post comment like removed successfully');
+      return true;
+    } else {
+      // Add like
+      console.log('👍 Adding new blog post comment like...');
+      const { error: insertError } = await supabase
+        .from('blog_post_comment_likes')
+        .insert([
+          {
+            blog_post_comment_id: commentId,
+            username: username,
+          }
+        ]);
+
+      if (insertError) {
+        console.error('❌ Error inserting blog post comment like:', insertError);
+        return false;
+      }
+      
+      // Create notification for comment author
+      const { data: comment } = await supabase
+        .from('blog_post_comments')
+        .select('username, blog_post_id')
+        .eq('id', commentId)
+        .single();
+      
+      if (comment && comment.username !== username) {
+        await createNotification(
+          comment.username,
+          username,
+          'like',
+          'blog_post_comment',
+          commentId,
+          `${username} liked your comment`
+        );
+      }
+      
+      console.log('✅ Blog post comment like added successfully');
+      return true;
+    }
+  } catch (err) {
+    console.error('💥 Failed to toggle blog post comment like:', err);
+    return false;
+  }
+};
+
+export const getBlogPostCommentLikeCounts = async (commentIds: string[]): Promise<{ [key: string]: number }> => {
+  if (!supabase || commentIds.length === 0) return {};
+  
+  try {
+    console.log('🔢 Fetching blog post comment like counts for:', commentIds.length, 'comments');
+    
+    const { data, error } = await supabase
+      .from('blog_post_comment_likes')
+      .select('blog_post_comment_id')
+      .in('blog_post_comment_id', commentIds);
+
+    if (error) {
+      console.error('❌ Error fetching blog post comment like counts:', error);
+      return {};
+    }
+
+    // Count likes per comment
+    const likeCounts: { [key: string]: number } = {};
+    data?.forEach(like => {
+      likeCounts[like.blog_post_comment_id] = (likeCounts[like.blog_post_comment_id] || 0) + 1;
+    });
+
+    console.log('✅ Blog post comment like counts fetched:', likeCounts);
+    return likeCounts;
+  } catch (err) {
+    console.error('💥 Failed to fetch blog post comment like counts:', err);
+    return {};
+  }
+};
+
+export const getUserBlogPostCommentLikes = async (commentIds: string[], username: string): Promise<{ [key: string]: boolean }> => {
+  if (!supabase || commentIds.length === 0) return {};
+  
+  try {
+    console.log('👤 Fetching user blog post comment likes for:', username, 'on', commentIds.length, 'comments');
+    
+    const { data, error } = await supabase
+      .from('blog_post_comment_likes')
+      .select('blog_post_comment_id')
+      .in('blog_post_comment_id', commentIds)
+      .eq('username', username);
+
+    if (error) {
+      console.error('❌ Error fetching user blog post comment likes:', error);
+      return {};
+    }
+
+    // Create lookup for user's likes
+    const userLikes: { [key: string]: boolean } = {};
+    data?.forEach(like => {
+      userLikes[like.blog_post_comment_id] = true;
+    });
+
+    console.log('✅ User blog post comment likes fetched:', userLikes);
+    return userLikes;
+  } catch (err) {
+    console.error('💥 Failed to fetch user blog post comment likes:', err);
+    return {};
+  }
+};
+
 // Pin update function
 export const updatePin = async (
   pinId: string,
@@ -962,7 +1256,7 @@ export const createNotification = async (
   recipientUsername: string,
   senderUsername: string,
   type: 'like' | 'comment' | 'message',
-  entityType: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message',
+  entityType: 'pin' | 'blog_post' | 'marketplace_item' | 'chat_message' | 'comment' | 'blog_post_comment',
   entityId: string,
   message: string
 ): Promise<boolean> => {
