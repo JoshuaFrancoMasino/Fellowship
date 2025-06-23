@@ -223,6 +223,24 @@ function App() {
     setIsMarketplaceModalOpen(true);
   };
 
+  const handleOpenBlogPostFromNotification = async (blogPostId: string) => {
+    try {
+      // Import getBlogPost from supabase if not already imported
+      const { getBlogPost } = await import('./lib/supabase');
+      const blogPost = await getBlogPost(blogPostId);
+      
+      if (blogPost) {
+        setSelectedBlogPost(blogPost);
+        setIsBlogModalOpen(true);
+      } else {
+        // Handle case where blog post doesn't exist or was deleted
+        console.error('Blog post not found:', blogPostId);
+      }
+    } catch (error) {
+      console.error('Error fetching blog post from notification:', error);
+    }
+  };
+
   const handleOpenExploreModal = () => {
     setIsExploreModalOpen(true);
   };
@@ -724,7 +742,7 @@ function App() {
         isAuthenticated={isAuthenticated}
         onOpenUserProfile={handleOpenUserProfile}
         onSelectPin={handleSelectPinFromProfile}
-        onSelectBlogPost={handleSelectBlogPostFromProfile}
+        onSelectBlogPost={handleOpenBlogPostFromNotification}
         onSelectMarketplaceItem={handleSelectMarketplaceItemFromProfile}
       />
 

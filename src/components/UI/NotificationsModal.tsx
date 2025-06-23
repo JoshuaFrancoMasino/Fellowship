@@ -19,7 +19,7 @@ interface NotificationsModalProps {
   isAuthenticated: boolean;
   onOpenUserProfile: (username: string) => void;
   onSelectPin: (pinId: string) => void;
-  onSelectBlogPost: (postId: string) => void;
+  onSelectBlogPost: (blogPostId: string) => void;
   onSelectMarketplaceItem: (itemId: string) => void;
 }
 
