@@ -8,7 +8,6 @@ interface AuthPageProps {
 
 const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
   const [isSignUp, setIsSignUp] = useState(true);
-  const [isSignUp, setIsSignUp] = useState(true); // Default to sign up for guest users
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
