@@ -7,6 +7,7 @@ interface AuthPageProps {
 }
 
 const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
+  const [isSignUp, setIsSignUp] = useState(true);
   const [isSignUp, setIsSignUp] = useState(true); // Default to sign up for guest users
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +50,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
         // The App component will handle closing the auth page via onAuthStateChange
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      const errorMessage = err.message || 'An error occurred';
+      setError(errorMessage);
+      console.error('Authentication error:', err);
     } finally {
       setLoading(false);
     }

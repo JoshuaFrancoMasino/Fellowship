@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Trash2, X, User, Edit, Image, Upload } from 'lucide-react';
 import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
+import { useNotifications } from '../UI/NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface PinPopupProps {
   pin: Pin;
@@ -25,6 +27,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
   onClose,
   onEdit,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [likes, setLikes] = useState<{ [key: number]: number }>({});
@@ -156,8 +159,8 @@ const PinPopup: React.FC<PinPopupProps> = ({
             }
           }
         } catch (error) {
-          console.error('Error uploading comment media:', error);
-          alert('Failed to upload media. Please try again.');
+          logError('Error uploading comment media', error instanceof Error ? error : new Error(String(error)));
+          showError('Upload Failed', 'Failed to upload media. Please try again.');
         } finally {
           setIsUploadingCommentFile(false);
         }
@@ -187,14 +190,15 @@ const PinPopup: React.FC<PinPopupProps> = ({
 
       if (error) {
         console.error('❌ Error deleting comment:', error);
-        alert('Failed to delete comment. Please try again.');
+        showError('Delete Failed', 'Failed to delete comment. Please try again.');
       } else {
         console.log('✅ Comment deleted successfully');
+        showSuccess('Comment Deleted', 'Comment has been removed successfully.');
         fetchComments(); // Refresh comments list
       }
     } catch (err) {
-      console.error('💥 Failed to delete comment:', err);
-      alert('Failed to delete comment - database connection unavailable.');
+      logError('Failed to delete comment', err instanceof Error ? err : new Error(String(err)));
+      showError('Connection Error', 'Failed to delete comment - database connection unavailable.');
     } finally {
       setDeletingCommentId(null);
     }

@@ -11,6 +11,8 @@ import WelcomeModal from './components/UI/WelcomeModal';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
 import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem } from './lib/supabase';
+import { NotificationProvider, NotificationSystem } from './components/UI/NotificationSystem';
+import { logError } from './lib/utils/logger';
 import { getGuestUsername, setGuestUsername } from './lib/storage';
 import { LocationData } from './lib/geocoding';
 
@@ -250,7 +252,7 @@ function App() {
       } catch (error) {
         console.error('💥 Unexpected error during sign out:', error);
         alert('Unexpected error during sign out: ' + (error as Error).message);
-      }
+        // Check if the error is related to invalid refresh token 
     } else {
       console.error('❌ Supabase client not available for sign out');
       alert('Sign out failed: Supabase client not available');
@@ -300,7 +302,7 @@ function App() {
     
     if (!isConnected) {
       console.log('❌ Pin creation blocked: No database connection');
-      alert('Cannot add pins - database connection unavailable. Please check your Supabase configuration.');
+      // Note: This will be handled by individual components using the notification system
       return;
     }
 
@@ -405,7 +407,7 @@ function App() {
 
   const handleDeletePin = async (pinId: string) => {
     if (!isConnected || !supabase) {
-      alert('Cannot delete pins - database connection unavailable.');
+      // Note: This will be handled by individual components using the notification system
       return;
     }
 
@@ -421,8 +423,8 @@ function App() {
         fetchPins();
       }
     } catch (err) {
-      console.error('Failed to delete pin:', err);
-      alert('Failed to delete pin - database connection unavailable.');
+      logError('Failed to delete pin', err instanceof Error ? err : new Error(String(err)));
+      // Note: This will be handled by individual components using the notification system
     }
   };
 
@@ -436,7 +438,7 @@ function App() {
 
     if (!isConnected || !supabase) {
       console.log('❌ Like blocked: No database connection');
-      alert('Cannot like pins - database connection unavailable.');
+      // Note: This will be handled by individual components using the notification system
       return;
     }
 
@@ -488,13 +490,13 @@ function App() {
         }
       }
     } catch (err) {
-      console.error('💥 Failed to toggle like:', err);
+      logError('Failed to toggle like', err instanceof Error ? err : new Error(String(err)));
     }
   };
 
   const handleCommentPin = async (pinId: string, comment: string, mediaUrl?: string) => {
     if (!isConnected || !supabase) {
-      alert('Cannot add comments - database connection unavailable.');
+      // Note: This will be handled by individual components using the notification system
       return;
     }
 
@@ -514,8 +516,8 @@ function App() {
         console.error('Error adding comment:', error);
       }
     } catch (err) {
-      console.error('Failed to add comment:', err);
-      alert('Failed to add comment - database connection unavailable.');
+      logError('Failed to add comment', err instanceof Error ? err : new Error(String(err)));
+      // Note: This will be handled by individual components using the notification system
     }
   };
 
@@ -558,7 +560,10 @@ function App() {
 
   console.log('🗺️ Rendering main app');
   return (
-    <div className="h-screen w-full bg-blue-500 overflow-hidden relative">
+    <NotificationProvider>
+      <div className="h-screen w-full bg-blue-500 overflow-hidden relative">
+        <NotificationSystem />
+        
       {/* Map Layer - positioned at the bottom */}
       <div className="absolute inset-0 z-0">
         <MapComponent
@@ -665,7 +670,7 @@ function App() {
       />
 
       {!isConnected && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
           Database connection unavailable. Please check your Supabase configuration.
         </div>
       )}
@@ -684,6 +689,8 @@ function App() {
         </div>
       )}
     </div>
+      </div>
+    </NotificationProvider>
   );
 }
 
