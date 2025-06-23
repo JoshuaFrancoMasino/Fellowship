@@ -42,21 +42,20 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [subscriptionRef, setSubscriptionRef] = useState<any>(null);
 
   useEffect(() => {
+    let subscription: any = null;
+    
     if (isOpen && isAuthenticated) {
       fetchNotifications();
       fetchUnreadCount();
-      const subscription = setupRealtimeSubscription();
-      setSubscriptionRef(subscription);
+      subscription = setupRealtimeSubscription();
     }
 
     return () => {
       // Cleanup subscription on unmount or when modal closes
-      if (subscriptionRef) {
-        subscriptionRef.unsubscribe();
-        setSubscriptionRef(null);
+      if (subscription) {
+        subscription.unsubscribe();
       }
     };
   }, [isOpen, isAuthenticated, currentUser]);
