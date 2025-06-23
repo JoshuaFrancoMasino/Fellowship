@@ -133,6 +133,18 @@ export type BlogPostComment = {
   created_at: string;
 };
 
+export type Notification = {
+  id: string;
+  recipient_username: string;
+  sender_username: string;
+  type: 'like' | 'comment' | 'message';
+  entity_type: 'pin' | 'blog_post' | 'marketplace_item';
+  entity_id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
 export const getCurrentUserProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
   
