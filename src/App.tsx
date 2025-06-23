@@ -12,6 +12,7 @@ import NotificationsModal from './components/UI/NotificationsModal';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
 import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem, getUnreadNotificationCount } from './lib/supabase';
+import { getUnreadNotificationCountByType } from './lib/supabase';
 import { NotificationProvider, NotificationSystem } from './components/UI/NotificationSystem';
 import { logError } from './lib/utils/logger';
 import { getGuestUsername, setGuestUsername } from './lib/storage';

@@ -14,6 +14,7 @@ interface FloatingControlsProps {
   currentUser: string;
   isAuthenticated: boolean;
   unreadNotificationCount: number;
+  unreadChatNotificationCount: number;
 }
 
 const FloatingControls: React.FC<FloatingControlsProps> = ({
@@ -29,6 +30,7 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
   currentUser,
   isAuthenticated,
   unreadNotificationCount,
+  unreadChatNotificationCount,
 }) => {
   return (
     <>
@@ -81,10 +83,17 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
         {/* Chat Button */}
         <button
           onClick={onOpenChatWindow}
-          className="w-14 h-14 glass-blue rounded-full shadow-xl flex items-center justify-center hover:bg-blue-200/30 hover:scale-105 transition-all duration-200 pointer-events-auto"
+          className="w-14 h-14 glass-blue rounded-full shadow-xl flex items-center justify-center hover:bg-blue-200/30 hover:scale-105 transition-all duration-200 pointer-events-auto relative"
           title="Open chat"
         >
           <MessageSquare className="w-6 h-6 text-blue-700 icon-shadow-white-sm" />
+          {unreadChatNotificationCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+              <span className="text-xs text-white font-bold">
+                {unreadChatNotificationCount > 9 ? '9+' : unreadChatNotificationCount}
+              </span>
+            </div>
+          )}
         </button>
 
         {/* Stats Panel - Now Clickable for Explore */}
