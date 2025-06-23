@@ -253,11 +253,12 @@ function App() {
         console.error('💥 Unexpected error during sign out:', error);
         alert('Unexpected error during sign out: ' + (error as Error).message);
         // Check if the error is related to invalid refresh token 
-    } else {
+          } else {
       console.error('❌ Supabase client not available for sign out');
       alert('Sign out failed: Supabase client not available');
     }
-  };
+      };
+  }
 
   const handleSignOutCancel = () => {
     console.log('❌ Sign out cancelled by user');

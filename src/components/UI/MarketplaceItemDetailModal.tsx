@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, MessageCircle, User, Calendar, DollarSign, ChevronLeft, ChevronRight, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { MarketplaceItem, getProfileByUsername } from '../../lib/supabase';
 import { chatService } from '../../lib/chatService';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface MarketplaceItemDetailModalProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   isAdminUser,
   onOpenUserProfile,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [contactMessage, setContactMessage] = useState('');
   const [isContacting, setIsContacting] = useState(false);
@@ -79,17 +82,17 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
 
   const handleContactSeller = async () => {
     if (!isAuthenticated) {
-      setContactError('Please sign in to contact sellers');
+      showWarning('Sign In Required', 'Please sign in to contact sellers');
       return;
     }
 
     if (!contactMessage.trim()) {
-      setContactError('Please enter a message');
+      showWarning('Message Required', 'Please enter a message');
       return;
     }
 
     if (item.seller_username === currentUser) {
-      setContactError('You cannot contact yourself');
+      showWarning('Invalid Action', 'You cannot contact yourself');
       return;
     }
 
@@ -107,16 +110,13 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
         setContactMessage('');
         onOpenChatWindow();
         onClose();
-        // Show success message
-        setTimeout(() => {
-          alert('Message sent! Check your direct messages to continue the conversation.');
-        }, 100);
+        showSuccess('Message Sent', 'Check your direct messages to continue the conversation.');
       } else {
-        setContactError('Failed to send message. Please try again.');
+        showError('Send Failed', 'Failed to send message. Please try again.');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
-      setContactError('Failed to send message. Please try again.');
+      logError('Error sending message', error instanceof Error ? error : new Error(String(error)));
+      showError('Send Failed', 'Failed to send message. Please try again.');
     } finally {
       setIsContacting(false);
     }

@@ -3,6 +3,8 @@ import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, C
 import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment, uploadImage, getImageUrl } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 import { useRef } from 'react';
+import { useNotifications } from './NotificationSystem';
+import { logError } from '../../lib/utils/logger';
 
 interface BlogModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   onOpenUserProfile,
   initialPost = null,
 }) => {
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -172,12 +175,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
         setNewComment('');
         setSelectedCommentFile(null);
         await fetchComments(); // Refresh comments
+        showSuccess('Comment Added', 'Your comment has been posted successfully.');
       } else {
         alert('Failed to post comment. Please try again.');
       }
     } catch (error) {
-      console.error('Error submitting comment:', error);
-      alert('Failed to post comment. Please try again.');
+      logError('Error creating blog post comment', error instanceof Error ? error : new Error(String(error)));
+      showError('Comment Failed', 'Failed to add comment. Please try again.');
     } finally {
       setSubmittingComment(false);
     }
@@ -192,12 +196,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
       
       if (success) {
         await fetchComments(); // Refresh comments
+        showSuccess('Comment Deleted', 'Comment has been removed successfully.');
       } else {
-        alert('Failed to delete comment. Please try again.');
+        showError('Delete Failed', 'Failed to delete comment. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting comment:', error);
-      alert('Failed to delete comment. Please try again.');
+      logError('Error deleting blog post comment', error instanceof Error ? error : new Error(String(error)));
+      showError('Delete Failed', 'Failed to delete comment. Please try again.');
     } finally {
       setDeletingComment(null);
     }
@@ -216,10 +221,10 @@ const BlogModal: React.FC<BlogModalProps> = ({
         if (file.size <= 5 * 1024 * 1024) {
           setSelectedCommentFile(file);
         } else {
-          alert('File size must be less than 5MB');
+          showError('File Too Large', 'File size must be less than 5MB');
         }
       } else {
-        alert('Please select an image or GIF file');
+        showError('Invalid File Type', 'Please select an image or GIF file');
       }
     }
     
@@ -302,8 +307,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
         alert('Failed to update editor\'s choice status');
       }
     } catch (error) {
-      console.error('Error toggling editor choice:', error);
-      alert('Failed to update editor\'s choice status');
+      logError('Error toggling editor choice', error instanceof Error ? error : new Error(String(error)));
+      showError('Update Failed', 'Failed to update editor\'s choice status');
     } finally {
       setTogglingEditorChoice(null);
     }
@@ -311,7 +316,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
 
   const handleToggleLike = async (postId: string) => {
     if (!currentUser) {
-      alert('Please sign in or set a username to like posts');
+      showWarning('Sign In Required', 'Please sign in to like blog posts');
       return;
     }
 
@@ -347,11 +352,11 @@ const BlogModal: React.FC<BlogModalProps> = ({
           }));
         }
       } else {
-        alert('Failed to update like status');
+        showError('Like Failed', 'Failed to update like status');
       }
     } catch (error) {
-      console.error('Error toggling like:', error);
-      alert('Failed to update like status');
+      logError('Error toggling blog post like', error instanceof Error ? error : new Error(String(error)));
+      showError('Like Failed', 'Failed to update like status');
     } finally {
       setTogglingLike(null);
     }
@@ -375,8 +380,8 @@ const BlogModal: React.FC<BlogModalProps> = ({
         setSelectedPost(null); // Close the post detail view if it's the deleted post
       }
     } catch (error) {
-      console.error('Error deleting blog post:', error);
-      alert('Failed to delete blog post. Please try again.');
+      logError('Error deleting blog post', error instanceof Error ? error : new Error(String(error)));
+      showError('Delete Failed', 'Failed to delete blog post. Please try again.');
     }
   };
 
