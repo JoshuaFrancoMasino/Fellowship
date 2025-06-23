@@ -141,7 +141,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onCloseAuth }) => {
               className="w-full h-full object-cover rounded-full"
             />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2 text-shadow-white-md">Fellowship Finder</h1>
+          <h1 className="text-4xl font-bold text-white mb-2 text-shadow-white-md">FELLOWSHIP FINDER</h1>
           <p className="text-blue-100 text-shadow-white-sm">Connecting Christian communities & sharing the love of YHWH</p>
         </div>
 
