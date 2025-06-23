@@ -724,6 +724,8 @@ export const toggleBlogPostLike = async (blogPostId: string, username: string): 
   if (!supabase) return false;
   
   try {
+    let wasLiked = false;
+    
     // Check if like already exists
     const { data: existingLike, error: selectError } = await supabase
       .from('blog_post_likes')
@@ -744,7 +746,8 @@ export const toggleBlogPostLike = async (blogPostId: string, username: string): 
         .delete()
         .eq('id', existingLike.id);
 
-      return !deleteError;
+      wasLiked = false;
+      if (deleteError) return false;
     } else {
       // Add like
       const { error: insertError } = await supabase
@@ -756,8 +759,29 @@ export const toggleBlogPostLike = async (blogPostId: string, username: string): 
           }
         ]);
 
-      return !insertError;
+      wasLiked = true;
+      if (insertError) return false;
+      
+      // Create notification for blog post author if this is a new like
+      const { data: blogPost } = await supabase
+        .from('blog_posts')
+        .select('author_username, title')
+        .eq('id', blogPostId)
+        .single();
+      
+      if (blogPost && blogPost.author_username !== username) {
+        await createNotification(
+          blogPost.author_username,
+          username,
+          'like',
+          'blog_post',
+          blogPostId,
+          `${username} liked your blog post "${blogPost.title}"`
+        );
+      }
     }
+    
+    return true;
   } catch (err) {
     console.error('Failed to toggle blog post like:', err);
     return false;
@@ -851,13 +875,6 @@ export const createBlogPostComment = async (
   if (!supabase) return false;
   
   try {
-    // First, get the blog post author to send notification
-    const { data: blogPost } = await supabase
-      .from('blog_posts')
-      .select('author_username, title')
-      .eq('id', blogPostId)
-      .single();
-    
     const { error } = await supabase
       .from('blog_post_comments')
       .insert([
@@ -875,7 +892,13 @@ export const createBlogPostComment = async (
     }
 
     // Create notification for the blog post author
-    if (blogPost) {
+    const { data: blogPost } = await supabase
+      .from('blog_posts')
+      .select('author_username, title')
+      .eq('id', blogPostId)
+      .single();
+    
+    if (blogPost && blogPost.author_username !== username) {
       await createNotification(
         blogPost.author_username,
         username,
