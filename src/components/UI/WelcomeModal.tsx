@@ -40,7 +40,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 pb-8 overflow-y-auto max-h-[calc(90vh-120px)]">
           {/* Introduction */}
           <div className="mb-8 text-center">
             <h3 className="text-2xl font-bold text-gray-200 mb-4">
