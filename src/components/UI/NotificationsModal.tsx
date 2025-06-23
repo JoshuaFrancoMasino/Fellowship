@@ -80,19 +80,9 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           filter: `recipient_username=eq.${currentUser}`
         },
         (payload) => {
-          // Only refetch if it's not a delete event, or if it's an insert/update
-          if (payload.eventType !== 'DELETE' || payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            fetchNotifications();
-            fetchUnreadCount();
-          } else if (payload.eventType === 'DELETE') {
-            // For delete events, just remove the notification from local state
-            // to prevent refetching and reappearing
-            const deletedId = payload.old?.id;
-            if (deletedId) {
-              setNotifications(prev => prev.filter(n => n.id !== deletedId));
-              fetchUnreadCount();
-            }
-          }
+          // Always refetch data for any change to ensure consistency
+          fetchNotifications();
+          fetchUnreadCount();
         }
       )
       .subscribe();
