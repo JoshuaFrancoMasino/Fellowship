@@ -133,6 +133,12 @@ export type BlogPostComment = {
   created_at: string;
 };
 
+export type ForbiddenUsername = {
+  id: string;
+  word: string;
+  created_at: string;
+};
+
 export const getCurrentUserProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
   
@@ -899,6 +905,52 @@ export const updatePin = async (
     return !error;
   } catch (err) {
     console.error('Failed to update pin:', err);
+    return false;
+  }
+};
+
+// Forbidden usernames functions
+export const getForbiddenUsernames = async (): Promise<ForbiddenUsername[]> => {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('forbidden_usernames')
+      .select('*')
+      .order('word', { ascending: true });
+    if (error) {
+      console.error('Error fetching forbidden usernames:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch forbidden usernames:', err);
+    return [];
+  }
+};
+
+export const addForbiddenUsername = async (word: string): Promise<boolean> => {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase
+      .from('forbidden_usernames')
+      .insert([{ word: word.toLowerCase() }]);
+    return !error;
+  } catch (err) {
+    console.error('Failed to add forbidden username:', err);
+    return false;
+  }
+};
+
+export const deleteForbiddenUsername = async (id: string): Promise<boolean> => {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase
+      .from('forbidden_usernames')
+      .delete()
+      .eq('id', id);
+    return !error;
+  } catch (err) {
+    console.error('Failed to delete forbidden username:', err);
     return false;
   }
 };

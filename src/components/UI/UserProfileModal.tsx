@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText, BookOpen, ShoppingBag } from 'lucide-react';
+import { User, MapPin, X, Settings, ArrowRight, ChevronDown, Camera, Upload, Edit, Save, MessageCircle, UserPlus, Globe, FileText, BookOpen, ShoppingBag, Shield } from 'lucide-react';
 import { Pin, getUserPins, getCurrentUserProfile, updateUserProfile, uploadImage, getImageUrl, getProfileByUsername, supabase, BlogPost, MarketplaceItem, getUserBlogPosts, getUserMarketplaceItems } from '../../lib/supabase';
 
 interface UserProfileModalProps {
@@ -244,6 +244,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     onOpenChatWindow(username);
     onClose();
+  };
+
+  const handleOpenAdminPanel = () => {
+    onClose(); // Close UserProfileModal
+    window.dispatchEvent(new CustomEvent('openAdminPanel')); // Dispatch custom event
   };
 
   const formatDate = (dateString: string) => {
@@ -630,6 +635,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <p className="text-sm text-gray-400 mt-1">
                     Guest usernames cannot be changed. Sign up for an account to customize your username.
                   </p>
+                </div>
+              )}
+              
+              {/* Admin Panel Button */}
+              {isCurrentUserAdmin && (
+                <div className="mt-6">
+                  <button
+                    onClick={handleOpenAdminPanel}
+                    className="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Open Admin Panel</span>
+                  </button>
                 </div>
               </div>
             )}

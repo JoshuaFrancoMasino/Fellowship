@@ -10,6 +10,7 @@ import ChatWindow from './components/UI/ChatWindow';
 import WelcomeModal from './components/UI/WelcomeModal';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
+import AdminPanelModal from './components/UI/AdminPanelModal';
 import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem } from './lib/supabase';
 import { getGuestUsername, setGuestUsername } from './lib/storage';
 import { LocationData } from './lib/geocoding';
@@ -37,6 +38,7 @@ function App() {
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
   const [selectedMarketplaceItem, setSelectedMarketplaceItem] = useState<MarketplaceItem | null>(null);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
 
   useEffect(() => {
     // Check authentication status
@@ -101,6 +103,19 @@ function App() {
 
     return () => {
       window.removeEventListener('openAuth', handleOpenAuth);
+    };
+  }, []); // Empty dependency array - only run once on mount
+
+  // New useEffect for admin panel event listener
+  useEffect(() => {
+    const handleOpenAdminPanelEvent = () => {
+      setIsAdminPanelOpen(true);
+    };
+
+    window.addEventListener('openAdminPanel', handleOpenAdminPanelEvent);
+
+    return () => {
+      window.removeEventListener('openAdminPanel', handleOpenAdminPanelEvent);
     };
   }, []); // Empty dependency array - only run once on mount
 
@@ -662,6 +677,12 @@ function App() {
         isOpen={showSignOutConfirmation}
         onConfirm={handleSignOutConfirm}
         onCancel={handleSignOutCancel}
+      />
+
+      <AdminPanelModal
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
+        isAdminUser={isAdminUser}
       />
 
       {!isConnected && (
