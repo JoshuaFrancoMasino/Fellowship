@@ -905,7 +905,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
           </div>
 
           {/* Posts Grid */}
-          <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto max-h-full pb-[40rem]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>

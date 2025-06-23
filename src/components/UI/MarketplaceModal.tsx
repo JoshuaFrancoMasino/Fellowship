@@ -335,7 +335,7 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
           </div>
 
           {/* Items Grid */}
-         <div className="p-6 overflow-y-auto max-h-full">
+         <div className="p-6 overflow-y-auto max-h-full pb-[40rem]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
