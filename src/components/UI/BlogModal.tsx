@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Cross, Heart, ArrowLeft, MessageCircle, Send, Upload, Image } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment, uploadImage, getImageUrl } from '../../lib/supabase';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, toggleBlogPostCommentLike, getBlogPostCommentLikeCounts, getUserBlogPostCommentLikes, BlogPostComment, uploadImage, getImageUrl } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 import { useRef } from 'react';
 import { useNotifications } from './NotificationSystem';
@@ -45,6 +45,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [deletingComment, setDeletingComment] = useState<string | null>(null);
+  const [commentLikeCounts, setCommentLikeCounts] = useState<{ [key: string]: number }>({});
+  const [userCommentLikes, setUserCommentLikes] = useState<{ [key: string]: boolean }>({});
+  const [togglingCommentLike, setTogglingCommentLike] = useState<string | null>(null);
 
   // Media upload state for comments
   const [selectedCommentFile, setSelectedCommentFile] = useState<File | null>(null);
@@ -85,6 +88,13 @@ const BlogModal: React.FC<BlogModalProps> = ({
       setNewComment('');
     }
   }, [selectedPost]);
+
+  // Fetch like data when comments change
+  useEffect(() => {
+    if (comments.length > 0) {
+      fetchCommentLikeData();
+    }
+  }, [comments, currentUser]);
 
   const fetchProfilePictures = async () => {
     const usernames = [...new Set(posts.map(post => post.author_username))];
@@ -139,6 +149,83 @@ const BlogModal: React.FC<BlogModalProps> = ({
       console.error('Error fetching comments:', error);
     } finally {
       setLoadingComments(false);
+    }
+  };
+
+  const fetchCommentLikeData = async () => {
+    if (comments.length === 0) return;
+
+    const commentIds = comments.map(comment => comment.id);
+
+    try {
+      // Fetch like counts for all comments
+      const likeCounts = await getBlogPostCommentLikeCounts(commentIds);
+      setCommentLikeCounts(likeCounts);
+
+      // Fetch user's likes for these comments
+      if (currentUser) {
+        const userLikes = await getUserBlogPostCommentLikes(commentIds, currentUser);
+        setUserCommentLikes(userLikes);
+      }
+    } catch (error) {
+      console.error('Error fetching comment like data:', error);
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: string) => {
+    if (!currentUser) {
+      showWarning('Sign In Required', 'Please sign in to like comments');
+      return;
+    }
+
+    setTogglingCommentLike(commentId);
+
+    // Optimistic UI updates
+    const currentLikeCount = commentLikeCounts[commentId] || 0;
+    const userHasLiked = userCommentLikes[commentId] || false;
+
+    const newLikeCount = userHasLiked ? currentLikeCount - 1 : currentLikeCount + 1;
+    const newUserLikeStatus = !userHasLiked;
+
+    // Update UI immediately
+    setCommentLikeCounts(prev => ({
+      ...prev,
+      [commentId]: Math.max(0, newLikeCount)
+    }));
+    setUserCommentLikes(prev => ({
+      ...prev,
+      [commentId]: newUserLikeStatus
+    }));
+
+    try {
+      const success = await toggleBlogPostCommentLike(commentId, currentUser);
+
+      if (!success) {
+        // Revert optimistic updates on failure
+        setCommentLikeCounts(prev => ({
+          ...prev,
+          [commentId]: currentLikeCount
+        }));
+        setUserCommentLikes(prev => ({
+          ...prev,
+          [commentId]: userHasLiked
+        }));
+        showError('Like Failed', 'Failed to update like status');
+      }
+    } catch (error) {
+      logError('Error toggling comment like', error instanceof Error ? error : new Error(String(error)));
+      // Revert optimistic updates on error
+      setCommentLikeCounts(prev => ({
+        ...prev,
+        [commentId]: currentLikeCount
+      }));
+      setUserCommentLikes(prev => ({
+        ...prev,
+        [commentId]: userHasLiked
+      }));
+      showError('Like Failed', 'Failed to update like status');
+    } finally {
+      setTogglingCommentLike(null);
     }
   };
 
@@ -732,6 +819,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
                     const commentProfilePicture = profilePictureCache[comment.username];
                     const canDelete = canDeleteComment(comment);
                     const isDeleting = deletingComment === comment.id;
+                    const commentLikeCount = commentLikeCounts[comment.id] || 0;
+                    const userHasLikedComment = userCommentLikes[comment.id] || false;
+                    const isTogglingThisComment = togglingCommentLike === comment.id;
 
                     return (
                       <div key={comment.id} className="bg-gray-800 rounded-lg p-4">
@@ -793,13 +883,60 @@ const BlogModal: React.FC<BlogModalProps> = ({
                               )}
                             </div>
 
-                            {/* Comment Text */}
-                            {comment.text && (
-                              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                {comment.text}
-                              </p>
-                            )}
-
+                            {/* Comment Content */}
+                            <div className="flex items-start justify-between">
+                              <div className="text-sm flex-1">
+                                {isGuestUser(comment.username) ? (
+                                  // Non-clickable version for guest users
+                                  <span className="font-medium text-blue-400 cursor-default">
+                                    Guest {comment.username}
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUserProfileClick(comment.username)}
+                                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                                  >
+                                    {comment.username}
+                                  </button>
+                                )}
+                                <span className="text-xs text-gray-400 ml-2">
+                                  {formatCommentDate(comment.created_at)}
+                                </span>
+                                {comment.text && (
+                                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                    {comment.text}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Comment Like Button */}
+                              <div className="flex items-center space-x-1 ml-2">
+                                {commentLikeCount > 0 && (
+                                  <span className="text-xs text-gray-400">
+                                    {commentLikeCount}
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => handleToggleCommentLike(comment.id)}
+                                  disabled={isTogglingThisComment}
+                                  className={`p-1 rounded-full transition-all duration-200 hover:scale-110 ${
+                                    userHasLikedComment
+                                      ? 'text-red-400 hover:text-red-300'
+                                      : 'text-gray-400 hover:text-red-300'
+                                  } ${isTogglingThisComment ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  title={userHasLikedComment ? 'Unlike comment' : 'Like comment'}
+                                >
+                                  {isTogglingThisComment ? (
+                                    <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Heart
+                                      className={`w-3 h-3 ${userHasLikedComment ? 'fill-current' : ''}`}
+                                    />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            
                             {/* Media content */}
                             {comment.media_url && (
                               <div className="mt-2">
