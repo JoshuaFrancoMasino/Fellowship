@@ -851,6 +851,13 @@ export const createBlogPostComment = async (
   if (!supabase) return false;
   
   try {
+    // First, get the blog post author to send notification
+    const { data: blogPost } = await supabase
+      .from('blog_posts')
+      .select('author_username, title')
+      .eq('id', blogPostId)
+      .single();
+    
     const { error } = await supabase
       .from('blog_post_comments')
       .insert([
@@ -865,6 +872,18 @@ export const createBlogPostComment = async (
     if (error) {
       console.error('Error creating blog post comment:', error);
       return false;
+    }
+
+    // Create notification for the blog post author
+    if (blogPost) {
+      await createNotification(
+        blogPost.author_username,
+        username,
+        'comment',
+        'blog_post',
+        blogPostId,
+        `${username} commented on your blog post "${blogPost.title}"`
+      );
     }
 
     return true;

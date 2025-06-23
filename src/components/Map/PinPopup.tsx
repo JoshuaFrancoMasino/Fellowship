@@ -167,6 +167,19 @@ const PinPopup: React.FC<PinPopupProps> = ({
       }
 
       await onComment(pin.id, newComment.trim() || '', mediaUrl);
+      
+      // Create notification for pin owner
+      if (newComment.trim() || mediaUrl) {
+        await createNotification(
+          pin.username,
+          currentUser,
+          'comment',
+          'pin',
+          pin.id,
+          `${currentUser} commented on your pin`
+        );
+      }
+      
       setNewComment('');
       setSelectedCommentFile(null);
       fetchComments();

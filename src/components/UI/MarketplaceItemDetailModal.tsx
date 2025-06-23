@@ -103,7 +103,10 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
       // Send message through chat service
       const success = await chatService.sendDirectMessage(
         item.seller_username,
-        `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`
+        `Hi! I'm interested in your listing: "${item.title}". ${contactMessage.trim()}`,
+        undefined, // no media
+        'marketplace_item',
+        item.id
       );
 
       if (success) {

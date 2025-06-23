@@ -88,6 +88,14 @@ class ChatService {
   async sendDirectMessage(recipientUsername: string, message: string): Promise<boolean> {
   }
   async sendDirectMessage(recipientUsername: string, message: string, mediaUrl?: string): Promise<boolean> {
+  }
+  async sendDirectMessage(
+    recipientUsername: string, 
+    message: string, 
+    mediaUrl?: string,
+    entityType?: 'marketplace_item',
+    entityId?: string
+  ): Promise<boolean> {
     if (!supabase || !this.isAuthenticated) {
       console.error('❌ Supabase not available or user not authenticated');
       return false;
@@ -111,6 +119,18 @@ class ChatService {
       if (error) {
         console.error('❌ Error sending message:', error);
         return false;
+      }
+
+      // Create notification for marketplace item inquiry if applicable
+      if (entityType === 'marketplace_item' && entityId) {
+        await createNotification(
+          recipientUsername,
+          this.currentUser,
+          'message',
+          'marketplace_item',
+          entityId,
+          `${this.currentUser} sent you a message about your marketplace listing`
+        );
       }
 
       console.log('✅ Message sent successfully');
