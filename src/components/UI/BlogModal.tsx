@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Cross, Heart, ArrowLeft, MessageCircle, Send } from 'lucide-react';
-import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment } from '../../lib/supabase';
+import { X, BookOpen, Search, Plus, Calendar, User, Eye, Edit, Trash2, Filter, Cross, Heart, ArrowLeft, MessageCircle, Send, Image, Upload } from 'lucide-react';
+import { BlogPost, getBlogPosts, getUserBlogPosts, deleteBlogPost, getCurrentUserProfile, getProfileByUsername, updateBlogPost, toggleBlogPostLike, getBlogPostLikeCounts, getUserBlogPostLikes, getBlogPostComments, createBlogPostComment, deleteBlogPostComment, BlogPostComment, uploadImage, getImageUrl } from '../../lib/supabase';
 import CreateBlogPostModal from './CreateBlogPostModal';
 
 interface BlogModalProps {
@@ -41,6 +41,9 @@ const BlogModal: React.FC<BlogModalProps> = ({
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [deletingComment, setDeletingComment] = useState<string | null>(null);
+  const [selectedCommentFile, setSelectedCommentFile] = useState<File | null>(null);
+  const [isUploadingCommentFile, setIsUploadingCommentFile] = useState(false);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -134,14 +137,35 @@ const BlogModal: React.FC<BlogModalProps> = ({
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim() || !selectedPost || !currentUser) return;
+    if ((!newComment.trim() && !selectedCommentFile) || !selectedPost || !currentUser) return;
 
     setSubmittingComment(true);
+    let mediaUrl: string | undefined;
+
     try {
-      const success = await createBlogPostComment(selectedPost.id, currentUser, newComment.trim());
+      // Upload file if selected
+      if (selectedCommentFile && isAuthenticated) {
+        setIsUploadingCommentFile(true);
+        const profile = await getCurrentUserProfile();
+        if (profile) {
+          const path = await uploadImage(selectedCommentFile, profile.id, 'chat-and-comment-media');
+          if (path) {
+            mediaUrl = getImageUrl(path, 'chat-and-comment-media');
+          }
+        }
+        setIsUploadingCommentFile(false);
+      }
+
+      const success = await createBlogPostComment(
+        selectedPost.id, 
+        currentUser, 
+        newComment.trim() || '', 
+        mediaUrl
+      );
       
       if (success) {
         setNewComment('');
+        setSelectedCommentFile(null);
         await fetchComments(); // Refresh comments
       } else {
         alert('Failed to post comment. Please try again.');
@@ -151,6 +175,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
       alert('Failed to post comment. Please try again.');
     } finally {
       setSubmittingComment(false);
+      setIsUploadingCommentFile(false);
     }
   };
 
@@ -176,6 +201,32 @@ const BlogModal: React.FC<BlogModalProps> = ({
 
   const canDeleteComment = (comment: BlogPostComment) => {
     return comment.username === currentUser || isAdminUser;
+  };
+
+  const handleCommentFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type (images and GIFs)
+      if (file.type.startsWith('image/')) {
+        // Validate file size (max 5MB)
+        if (file.size <= 5 * 1024 * 1024) {
+          setSelectedCommentFile(file);
+        } else {
+          alert('File size must be less than 5MB');
+        }
+      } else {
+        alert('Please select an image or GIF file');
+      }
+    }
+    
+    // Reset file input
+    if (commentFileInputRef.current) {
+      commentFileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveCommentFile = () => {
+    setSelectedCommentFile(null);
   };
 
   const fetchBlogPostLikeCounts = async () => {
@@ -573,30 +624,81 @@ const BlogModal: React.FC<BlogModalProps> = ({
                       )}
                     </div>
 
+                {/* Selected File Preview */}
+                {selectedCommentFile && (
+                  <div className="mb-3 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Image className="w-5 h-5 text-blue-400" />
+                        <span className="text-sm text-gray-200 truncate">
+                          {selectedCommentFile.name}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          ({(selectedCommentFile.size / 1024 / 1024).toFixed(1)} MB)
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRemoveCommentFile}
+                        className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                      >
+                        <X className="w-4 h-4 text-red-400 hover:text-white" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                     <div className="flex-1">
                       <textarea
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Write a comment..."
-                        maxLength={1000}
+                      placeholder={selectedCommentFile ? "Add a caption (optional)..." : "Write a comment..."}
                         rows={3}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 resize-none"
                       />
                       <div className="flex items-center justify-between mt-2">
-                        <div className="text-xs text-gray-400">
+                    <div className="flex items-center justify-between mt-3">
                           {newComment.length}/1000 characters
                         </div>
                         <button
+                      <div className="flex items-center space-x-2">
+                        {/* File Upload Button */}
+                        <button
+                          onClick={() => commentFileInputRef.current?.click()}
+                          disabled={!isAuthenticated || isUploadingCommentFile}
+                          className="p-2 bg-gray-600 hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 rounded-lg transition-colors"
+                          title="Upload image or GIF"
+                        >
+                          {isUploadingCommentFile ? (
+                            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        {/* Hidden File Input */}
+                        <input
+                          ref={commentFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCommentFileSelect}
+                          className="hidden"
+                        />
+
+                        {/* Submit Button */}
+                        <button
                           onClick={handleSubmitComment}
-                          disabled={!newComment.trim() || submittingComment}
+                          disabled={(!newComment.trim() && !selectedCommentFile) || submittingComment || isUploadingCommentFile}
                           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                         >
-                          {submittingComment ? (
+                          {submittingComment || isUploadingCommentFile ? (
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <Send className="w-4 h-4" />
                           )}
-                          <span>{submittingComment ? 'Posting...' : 'Post Comment'}</span>
+                          <span>
+                            {isUploadingCommentFile ? 'Uploading...' : submittingComment ? 'Posting...' : 'Post Comment'}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -684,9 +786,26 @@ const BlogModal: React.FC<BlogModalProps> = ({
                             </div>
 
                             {/* Comment Text */}
-                            <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                              {comment.text}
-                            </p>
+                            <div className="space-y-2">
+                              {/* Media content */}
+                              {comment.media_url && (
+                                <div>
+                                  <img
+                                    src={comment.media_url}
+                                    alt="Comment media"
+                                    className="max-w-full h-auto rounded-lg"
+                                    style={{ maxHeight: '200px' }}
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* Text content */}
+                              {comment.text && (
+                                <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                  {comment.text}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

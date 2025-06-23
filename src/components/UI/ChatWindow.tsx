@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2, Heart } from 'lucide-react';
+import { X, Send, MessageSquare, User, AlertCircle, UserPlus, Lock, Database, ArrowLeft, Clock, Search, Trash2, Heart, Image, Upload } from 'lucide-react';
 import { chatService, ChatMessage, Conversation } from '../../lib/chatService';
-import { getProfileByUsername, getCurrentUserProfile, toggleChatMessageLike, getChatMessageLikeCounts, getUserChatMessageLikes } from '../../lib/supabase';
+import { getProfileByUsername, getCurrentUserProfile, toggleChatMessageLike, getChatMessageLikeCounts, getUserChatMessageLikes, uploadImage, getImageUrl } from '../../lib/supabase';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -34,7 +34,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [messageLikeCounts, setMessageLikeCounts] = useState<{ [key: string]: number }>({});
   const [userMessageLikes, setUserMessageLikes] = useState<{ [key: string]: boolean }>({});
   const [togglingLike, setTogglingLike] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -251,14 +254,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !recipientUsername.trim() || !isConnected) return;
+    if ((!newMessage.trim() && !selectedFile) || !recipientUsername.trim() || !isConnected) return;
 
     setIsLoading(true);
+    let mediaUrl: string | undefined;
+
     try {
-      const success = await chatService.sendDirectMessage(recipientUsername.trim(), newMessage.trim());
+      // Upload file if selected
+      if (selectedFile && isAuthenticated && currentUser) {
+        setIsUploadingFile(true);
+        const profile = await getCurrentUserProfile();
+        if (profile) {
+          const path = await uploadImage(selectedFile, profile.id, 'chat-and-comment-media');
+          if (path) {
+            mediaUrl = getImageUrl(path, 'chat-and-comment-media');
+          }
+        }
+        setIsUploadingFile(false);
+      }
+
+      const success = await chatService.sendDirectMessage(
+        recipientUsername.trim(), 
+        newMessage.trim() || '', 
+        mediaUrl
+      );
       
       if (success) {
         setNewMessage('');
+        setSelectedFile(null);
         setMessageError('');
         // Refresh conversations list to update last message
         await fetchConversations();
@@ -271,6 +294,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       setMessageError('Failed to send message');
     } finally {
       setIsLoading(false);
+      setIsUploadingFile(false);
     }
   };
 
@@ -287,6 +311,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     setRecipientUsername(newChatUsername.trim());
     setNewChatUsername('');
     setViewingConversation(true);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type (images and GIFs)
+      if (file.type.startsWith('image/')) {
+        // Validate file size (max 5MB)
+        if (file.size <= 5 * 1024 * 1024) {
+          setSelectedFile(file);
+        } else {
+          alert('File size must be less than 5MB');
+        }
+      } else {
+        alert('Please select an image or GIF file');
+      }
+    }
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
   };
 
   const handleSelectConversation = (conversation: Conversation) => {
@@ -618,7 +668,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                                     : 'bg-gray-700 text-gray-200'
                                 }`}
                               >
-                                <p className="text-sm">{message.message}</p>
+                                {/* Media content */}
+                                {message.media_url && (
+                                  <div className="mb-2">
+                                    <img
+                                      src={message.media_url}
+                                      alt="Shared media"
+                                      className="max-w-full h-auto rounded-lg"
+                                      style={{ maxHeight: '200px' }}
+                                    />
+                                  </div>
+                                )}
+                                
+                                {/* Text content */}
+                                {message.message && (
+                                  <p className="text-sm">{message.message}</p>
+                                )}
+                                
                                 <div className="flex items-center justify-between mt-1">
                                   <p className={`text-xs ${
                                     isCurrentUser ? 'text-blue-200' : 'text-gray-400'
@@ -703,27 +769,78 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
               {/* Message Input */}
               <div className="border-t border-gray-700 p-4">
-                <div className="flex space-x-3">
+                {/* Selected File Preview */}
+                {selectedFile && (
+                  <div className="mb-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Image className="w-5 h-5 text-blue-400" />
+                        <span className="text-sm text-gray-200 truncate">
+                          {selectedFile.name}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRemoveFile}
+                        className="p-1 hover:bg-red-600 rounded-full transition-colors"
+                      >
+                        <X className="w-4 h-4 text-red-400 hover:text-white" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-end space-x-3">
+                  {/* File Upload Button */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!isAuthenticated || isUploadingFile}
+                    className="p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 rounded-lg transition-colors flex items-center justify-center"
+                    title="Upload image or GIF"
+                  >
+                    {isUploadingFile ? (
+                      <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Upload className="w-5 h-5" />
+                    )}
+                  </button>
+
+                  {/* Hidden File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {/* Message Input */}
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder={`Message ${recipientUsername}...`}
-                    disabled={!isConnected || isLoading}
+                    placeholder={selectedFile ? "Add a caption (optional)..." : `Message ${recipientUsername}...`}
+                    disabled={!isConnected || isLoading || isUploadingFile}
                     className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder:text-gray-400 disabled:opacity-50"
                   />
+
+                  {/* Send Button */}
                   <button
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || !isConnected || isLoading}
+                    disabled={(!newMessage.trim() && !selectedFile) || !isConnected || isLoading || isUploadingFile}
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
                   >
-                    {isLoading ? (
+                    {isLoading || isUploadingFile ? (
                       <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
-                    <span className="hidden sm:inline">Send</span>
+                    <span className="hidden sm:inline">
+                      {isUploadingFile ? 'Uploading...' : 'Send'}
+                    </span>
                   </button>
                 </div>
               </div>
