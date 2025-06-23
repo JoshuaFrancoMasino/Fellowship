@@ -7,6 +7,7 @@ interface FloatingControlsProps {
   onOpenChatWindow: () => void;
   onOpenMarketplaceModal: () => void;
   onOpenBlogModal: () => void;
+  onOpenWelcomeModal: () => void;
   onAuthButtonClick: () => void;
   totalPins: number;
   currentUser: string;
@@ -17,6 +18,7 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
   onOpenUserProfile,
   onOpenExploreModal,
   onOpenChatWindow,
+  onOpenWelcomeModal,
   onOpenMarketplaceModal,
   onOpenBlogModal,
   onAuthButtonClick,
@@ -90,14 +92,17 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
       </button>
 
       {/* Help Text */}
-      <div className="glass-blue rounded-2xl shadow-xl p-3 text-center max-w-[200px] pointer-events-auto">
+      <button
+        onClick={onOpenWelcomeModal}
+        className="glass-blue rounded-2xl shadow-xl p-3 text-center max-w-[200px] pointer-events-auto hover:bg-blue-200/30 hover:scale-105 transition-all duration-200 group"
+      >
         <div className="flex items-center justify-center space-x-1 mb-1">
-          <MapPin className="w-4 h-4 text-blue-800 icon-shadow-white-sm" />
+          <MapPin className="w-4 h-4 text-blue-800 icon-shadow-white-sm group-hover:text-blue-700 transition-colors" />
         </div>
-        <div className="text-xs font-medium text-blue-800 text-shadow-white-sm">
+        <div className="text-xs font-medium text-blue-800 text-shadow-white-sm group-hover:text-blue-700 transition-colors">
           Tap anywhere on the map to create a pin!
         </div>
-      </div>
+      </button>
     </div>
   );
 };

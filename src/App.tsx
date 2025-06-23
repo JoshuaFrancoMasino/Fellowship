@@ -7,6 +7,7 @@ import ExploreModal from './components/UI/ExploreModal';
 import MarketplaceModal from './components/UI/MarketplaceModal';
 import BlogModal from './components/UI/BlogModal';
 import ChatWindow from './components/UI/ChatWindow';
+import WelcomeModal from './components/UI/WelcomeModal';
 import AuthPage from './components/Auth/AuthPage';
 import SignOutConfirmationModal from './components/UI/SignOutConfirmationModal';
 import { Pin, supabase, getCurrentUserProfile, BlogPost, MarketplaceItem } from './lib/supabase';
@@ -22,6 +23,7 @@ function App() {
   const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState(false);
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
   const [isChatWindowOpen, setIsChatWindowOpen] = useState(false);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
   const [showSignOutConfirmation, setShowSignOutConfirmation] = useState(false);
   const [profileToViewUsername, setProfileToViewUsername] = useState('');
@@ -198,6 +200,10 @@ function App() {
   const handleOpenChatWindow = (recipientUsername?: string) => {
     setChatRecipientUsername(recipientUsername || '');
     setIsChatWindowOpen(true);
+  };
+
+  const handleOpenWelcomeModal = () => {
+    setIsWelcomeModalOpen(true);
   };
 
   const handleAuthButtonClick = () => {
@@ -578,6 +584,7 @@ function App() {
         onOpenMarketplaceModal={() => handleOpenMarketplaceModal()}
         onOpenBlogModal={() => handleOpenBlogModal()}
         onOpenChatWindow={() => handleOpenChatWindow()}
+        onOpenWelcomeModal={handleOpenWelcomeModal}
         onAuthButtonClick={handleAuthButtonClick}
         totalPins={pins.length}
         currentUser={currentUser}
@@ -635,6 +642,11 @@ function App() {
         isAuthenticated={isAuthenticated}
         onOpenUserProfile={handleOpenUserProfile}
         initialPost={selectedBlogPost}
+      />
+
+      <WelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={() => setIsWelcomeModalOpen(false)}
       />
 
       <ChatWindow
