@@ -112,7 +112,7 @@ const FloatingControls: React.FC<FloatingControlsProps> = ({
       </div>
 
       {/* Right Side Controls */}
-      <div className="fixed top-20 right-4 z-40 space-y-3 pointer-events-none">
+      <div className="fixed top-[220px] right-4 z-40 space-y-3 pointer-events-none">
         {/* Notifications Button - Only for authenticated users, positioned below map controls */}
         {isAuthenticated && (
           <button
