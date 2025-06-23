@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Trash2, X, User, Edit, Image, Upload } from 'lucide-react';
-import { Pin, Comment, supabase, getProfileByUsername, uploadImage, getImageUrl, getCurrentUserProfile } from '../../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { Heart, MessageCircle, Trash2, X, User, Edit } from 'lucide-react';
+import { Pin, Comment, supabase, getProfileByUsername } from '../../lib/supabase';
 
 interface PinPopupProps {
   pin: Pin;
@@ -8,7 +8,7 @@ interface PinPopupProps {
   isAdmin?: boolean;
   onDelete: () => void;
   onLike: (pinId: string, imageIndex: number) => void;
-  onComment: (pinId: string, comment: string, mediaUrl?: string) => void;
+  onComment: (pinId: string, comment: string) => void;
   onOpenUserProfile: (username: string) => void;
   onClose: () => void;
   onEdit?: (pin: Pin) => void;
@@ -34,9 +34,6 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const [authorProfilePicture, setAuthorProfilePicture] = useState<string | null>(null);
   const [commentProfilePictures, setCommentProfilePictures] = useState<{ [key: string]: string | null }>({});
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-  const [selectedCommentFile, setSelectedCommentFile] = useState<File | null>(null);
-  const [isUploadingCommentFile, setIsUploadingCommentFile] = useState(false);
-  const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if username is a guest user (7-digit number)
   const isGuestUser = (username: string) => username.match(/^\d{7}$/);
@@ -141,31 +138,9 @@ const PinPopup: React.FC<PinPopupProps> = ({
   };
 
   const handleComment = async () => {
-    if ((newComment.trim() || selectedCommentFile) && newComment.length <= 100) {
-      let mediaUrl: string | undefined;
-
-      // Upload file if selected
-      if (selectedCommentFile) {
-        setIsUploadingCommentFile(true);
-        try {
-          const profile = await getCurrentUserProfile();
-          if (profile) {
-            const path = await uploadImage(selectedCommentFile, profile.id, 'chat-and-comment-media');
-            if (path) {
-              mediaUrl = getImageUrl(path, 'chat-and-comment-media');
-            }
-          }
-        } catch (error) {
-          console.error('Error uploading comment media:', error);
-          alert('Failed to upload media. Please try again.');
-        } finally {
-          setIsUploadingCommentFile(false);
-        }
-      }
-
-      await onComment(pin.id, newComment.trim() || '', mediaUrl);
+    if (newComment.trim() && newComment.length <= 100) {
+      await onComment(pin.id, newComment.trim());
       setNewComment('');
-      setSelectedCommentFile(null);
       fetchComments();
     }
   };
@@ -227,32 +202,6 @@ const PinPopup: React.FC<PinPopupProps> = ({
   // Check if user can delete a specific comment
   const canDeleteComment = (comment: Comment) => {
     return comment.username === currentUser || isAdmin;
-  };
-
-  const handleCommentFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type (images and GIFs)
-      if (file.type.startsWith('image/')) {
-        // Validate file size (max 5MB)
-        if (file.size <= 5 * 1024 * 1024) {
-          setSelectedCommentFile(file);
-        } else {
-          alert('File size must be less than 5MB');
-        }
-      } else {
-        alert('Please select an image or GIF file');
-      }
-    }
-    
-    // Reset file input
-    if (commentFileInputRef.current) {
-      commentFileInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveCommentFile = () => {
-    setSelectedCommentFile(null);
   };
 
   // Calculate total likes across all images
@@ -539,23 +488,8 @@ const PinPopup: React.FC<PinPopupProps> = ({
                         {comment.username}
                       </button>
                     )}
-                    {comment.text && (
-                      <span className="text-gray-200 ml-2">{comment.text}</span>
-                    )}
+                    <span className="text-gray-200 ml-2">{comment.text}</span>
                   </div>
-                  
-                  {/* Media content */}
-                  {comment.media_url && (
-                    <div className="mt-2">
-                      <img
-                        src={comment.media_url}
-                        alt="Comment media"
-                        className="max-w-full h-auto rounded-lg"
-                        style={{ maxHeight: '150px' }}
-                      />
-                    </div>
-                  )}
-
                   <div className="text-xs text-gray-400 mt-1">
                     {formatDate(comment.created_at)}
                   </div>
@@ -584,70 +518,21 @@ const PinPopup: React.FC<PinPopupProps> = ({
         </div>
 
         {/* Add comment */}
-        {/* Selected File Preview */}
-        {selectedCommentFile && (
-          <div className="mb-3 p-3 bg-gray-700 rounded-lg border border-gray-600">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Image className="w-4 h-4 text-blue-400" />
-                <span className="text-xs text-gray-200 truncate">
-                  {selectedCommentFile.name}
-                </span>
-                <span className="text-xs text-gray-400">
-                  ({(selectedCommentFile.size / 1024 / 1024).toFixed(1)} MB)
-                </span>
-              </div>
-              <button
-                onClick={handleRemoveCommentFile}
-                className="p-1 hover:bg-red-600 rounded-full transition-colors"
-              >
-                <X className="w-3 h-3 text-red-400 hover:text-white" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-end space-x-2">
-          {/* File Upload Button */}
-          <button
-            onClick={() => commentFileInputRef.current?.click()}
-            disabled={isUploadingCommentFile}
-            className="p-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 rounded-full transition-colors"
-            title="Upload image or GIF"
-          >
-            {isUploadingCommentFile ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Hidden File Input */}
-          <input
-            ref={commentFileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleCommentFileSelect}
-            className="hidden"
-          />
-
-          {/* Comment Input */}
+        <div className="flex space-x-2">
           <input
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder={selectedCommentFile ? "Add a caption (optional)..." : "Add a comment..."}
+            placeholder="Add a comment..."
             maxLength={100}
             className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-200 placeholder:text-gray-400"
           />
-
-          {/* Submit Button */}
           <button
             onClick={handleComment}
-            disabled={(!newComment.trim() && !selectedCommentFile) || isUploadingCommentFile}
+            disabled={!newComment.trim()}
             className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-full text-sm font-medium hover:from-yellow-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {isUploadingCommentFile ? 'Uploading...' : 'Post'}
+            Post
           </button>
         </div>
         <div className="text-xs text-gray-400 mt-1">
