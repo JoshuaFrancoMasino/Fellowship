@@ -49,7 +49,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = username === currentUser;
-  const isGuestUser = username.match(/^\d{7}$/);
+  const isGuestUser = username?.match(/^\d{7}$/);
 
   useEffect(() => {
     if (isOpen && username) {

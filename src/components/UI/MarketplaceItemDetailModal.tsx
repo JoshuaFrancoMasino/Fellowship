@@ -38,7 +38,7 @@ const MarketplaceItemDetailModal: React.FC<MarketplaceItemDetailModalProps> = ({
   const [sellerProfilePicture, setSellerProfilePicture] = useState<string | null>(null);
 
   // Check if username is a guest user (7-digit number)
-  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
+  const isGuestUser = (username: string | null | undefined) => username?.match(/^\d{7}$/);
 
   useEffect(() => {
     if (item) {

@@ -42,7 +42,7 @@ const PinPopup: React.FC<PinPopupProps> = ({
   const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if username is a guest user (7-digit number)
-  const isGuestUser = (username: string) => username.match(/^\d{7}$/);
+  const isGuestUser = (username: string | null | undefined) => username?.match(/^\d{7}$/);
 
   useEffect(() => {
     console.log('🔄 PinPopup useEffect triggered for pin:', pin.id);
