@@ -247,12 +247,6 @@ function App() {
     setIsMarketplaceModalOpen(true);
   };
 
-  const handleOpenChatFromNotification = (messageId: string) => {
-    // For chat message notifications, we'll open the chat window
-    // The chat system will handle showing the relevant conversation
-    setIsChatWindowOpen(true);
-  };
-
   const handleOpenChatFromNotification = (senderUsername: string) => {
     // Open chat window with the specific sender
     handleOpenChatWindow(senderUsername);
