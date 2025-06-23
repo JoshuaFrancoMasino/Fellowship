@@ -22,6 +22,7 @@ interface NotificationsModalProps {
   onSelectBlogPost: (blogPostId: string) => void;
   onSelectMarketplaceItem: (itemId: string) => void;
   onSelectChatMessage: (messageId: string) => void;
+  onNotificationAction: () => void;
 }
 
 const NotificationsModal: React.FC<NotificationsModalProps> = ({
@@ -34,6 +35,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
   onSelectBlogPost,
   onSelectMarketplaceItem,
   onSelectChatMessage,
+  onNotificationAction,
 }) => {
   const { showError, showSuccess } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -111,6 +113,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
         );
         fetchUnreadCount();
+        onNotificationAction(); // Refresh notification counts
       } else {
         showError('Update Failed', 'Could not mark notification as read');
       }
@@ -127,6 +130,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
         showSuccess('Success', 'All notifications marked as read');
+        onNotificationAction(); // Refresh notification counts
       } else {
         showError('Update Failed', 'Could not mark all notifications as read');
       }
@@ -142,6 +146,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       if (success) {
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
         fetchUnreadCount();
+        onNotificationAction(); // Refresh notification counts
         showSuccess('Deleted', 'Notification removed');
       } else {
         showError('Delete Failed', 'Could not delete notification');

@@ -43,6 +43,7 @@ function App() {
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
   const [selectedMarketplaceItem, setSelectedMarketplaceItem] = useState<MarketplaceItem | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadChatNotificationCount, setUnreadChatNotificationCount] = useState(0);
 
   useEffect(() => {
     // Check authentication status
@@ -76,6 +77,7 @@ function App() {
             
             // Fetch unread notification count
             fetchUnreadNotificationCount(profile.username);
+            fetchUnreadChatNotificationCount(profile.username);
           } else {
             console.error('❌ Failed to fetch profile for signed in user');
           }
@@ -84,6 +86,7 @@ function App() {
           setIsAuthenticated(false);
           setIsAdminUser(false);
           setUnreadNotificationCount(0);
+          setUnreadChatNotificationCount(0);
           // Reset to guest username
           const guestUsername = getGuestUsername();
           console.log('🔄 Setting current user to guest:', guestUsername);
@@ -147,6 +150,16 @@ function App() {
     }
   };
 
+  // Fetch unread chat notification count
+  const fetchUnreadChatNotificationCount = async (username: string) => {
+    try {
+      const count = await getUnreadNotificationCountByType(username, 'chat_message');
+      setUnreadChatNotificationCount(count);
+    } catch (error) {
+      console.error('Error fetching unread chat notification count:', error);
+    }
+  };
+
   // Set up real-time notification subscription
   useEffect(() => {
     if (isAuthenticated && currentUser && supabase) {
@@ -161,6 +174,7 @@ function App() {
           },
           () => {
             fetchUnreadNotificationCount(currentUser);
+            fetchUnreadChatNotificationCount(currentUser);
           }
         )
         .subscribe();
@@ -170,6 +184,14 @@ function App() {
       };
     }
   }, [isAuthenticated, currentUser]);
+
+  // Handle notification actions (mark as read, delete, etc.)
+  const handleNotificationAction = () => {
+    if (isAuthenticated && currentUser) {
+      fetchUnreadNotificationCount(currentUser);
+      fetchUnreadChatNotificationCount(currentUser);
+    }
+  };
 
   const checkAuthStatus = async () => {
     if (!supabase) return;
@@ -184,6 +206,7 @@ function App() {
           setCurrentUser(profile.username);
           setIsAdminUser(profile.role === 'admin');
           fetchUnreadNotificationCount(profile.username);
+          fetchUnreadChatNotificationCount(profile.username);
         }
       }
     } catch (error) {
@@ -668,6 +691,7 @@ function App() {
         currentUser={currentUser}
         isAuthenticated={isAuthenticated}
         unreadNotificationCount={unreadNotificationCount}
+        unreadChatNotificationCount={unreadChatNotificationCount}
       />
 
       <PinFormModal
@@ -752,6 +776,7 @@ function App() {
         onSelectBlogPost={handleOpenBlogPostFromNotification}
         onSelectMarketplaceItem={handleSelectMarketplaceItemFromProfile}
         onSelectChatMessage={handleOpenChatFromNotification}
+        onNotificationAction={handleNotificationAction}
       />
 
       {!isConnected && (
