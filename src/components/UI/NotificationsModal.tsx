@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, BellOff, Check, CheckCheck, Trash2, User, Clock, MapPin, BookOpen, ShoppingBag } from 'lucide-react';
+import { X, Bell, BellOff, Check, CheckCheck, Trash2, User, Clock, MapPin, BookOpen, ShoppingBag, MessageCircle } from 'lucide-react';
 import { 
   Notification, 
   getNotificationsForUser, 
