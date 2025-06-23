@@ -823,7 +823,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+        <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="glass-header p-6 text-white">
             <div className="flex items-center justify-between">
@@ -1117,7 +1117,7 @@ const BlogModal: React.FC<BlogModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-700 p-4 bg-gray-900">
+          <div className="border-t border-gray-700 p-4 bg-gray-900 flex-shrink-0">
             <div className="text-center text-sm text-gray-400">
               Showing {filteredAndSortedPosts.length} of {posts.length} posts
               {filterBy === 'my-posts' && (
