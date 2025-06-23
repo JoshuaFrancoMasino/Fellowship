@@ -253,6 +253,11 @@ function App() {
     setIsChatWindowOpen(true);
   };
 
+  const handleOpenChatFromNotification = (senderUsername: string) => {
+    // Open chat window with the specific sender
+    handleOpenChatWindow(senderUsername);
+  };
+
   const handleOpenBlogPostFromNotification = async (blogPostId: string) => {
     try {
       // Import getBlogPost from supabase if not already imported

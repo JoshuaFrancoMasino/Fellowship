@@ -21,7 +21,7 @@ interface NotificationsModalProps {
   onSelectPin: (pinId: string) => void;
   onSelectBlogPost: (blogPostId: string) => void;
   onSelectMarketplaceItem: (itemId: string) => void;
-  onSelectChatMessage: (messageId: string) => void;
+  onSelectChatMessage: (senderUsername: string) => void;
   onNotificationAction: () => void;
 }
 
@@ -273,7 +273,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
         onSelectMarketplaceItem(notification.entity_id);
         break;
       case 'chat_message':
-        onSelectChatMessage(notification.entity_id);
+        onSelectChatMessage(notification.sender_username);
         break;
     }
 
