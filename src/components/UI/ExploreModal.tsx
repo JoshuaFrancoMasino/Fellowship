@@ -501,7 +501,7 @@ const ExploreModal: React.FC<ExploreModalProps> = ({
         </div>
 
         {/* Pins Grid */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <div className="p-6 overflow-y-auto max-h-full">
           {filteredAndSortedPins.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
